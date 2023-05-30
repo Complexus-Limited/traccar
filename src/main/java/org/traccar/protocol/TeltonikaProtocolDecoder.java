@@ -282,7 +282,71 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         });
         register(239, null, (p, b) -> p.set(Position.KEY_IGNITION, b.readUnsignedByte() > 0));
         register(240, null, (p, b) -> p.set(Position.KEY_MOTION, b.readUnsignedByte() > 0));
-        register(241, null, (p, b) -> p.set(Position.KEY_OPERATOR, b.readUnsignedInt()));
+        register(241, null, (p, b) -> {
+            switch ((int) b.readUnsignedInt()) {
+                case 2342:
+                    p.set(Position.KEY_OPERATOR, "o2");
+                    break;
+                case 2343:
+                    p.set(Position.KEY_OPERATOR, "Vodafone");
+                    break;
+                case 2352:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23231:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23410:
+                    p.set(Position.KEY_OPERATOR, "o2");
+                    break;
+                case 23411:
+                    p.set(Position.KEY_OPERATOR, "o2");
+                    break;
+                case 23415:
+                    p.set(Position.KEY_OPERATOR, "Vodafone");
+                    break;
+                case 23420:
+                    p.set(Position.KEY_OPERATOR, "Three");
+                    break;
+                case 23427:
+                    p.set(Position.KEY_OPERATOR, "Vodafone"); 
+					break;
+                case 23430:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23432:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23433:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23434:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23451:
+                    p.set(Position.KEY_OPERATOR, "Jersey Telecom");
+                    break;
+                case 23455:
+                    p.set(Position.KEY_OPERATOR, "Guernsey Telecoms");
+                    break;
+                case 23476:
+                    p.set(Position.KEY_OPERATOR, "BT");
+                    break;
+                case 23477:
+                    p.set(Position.KEY_OPERATOR, "BT");
+					break;
+                case 23491:
+                    p.set(Position.KEY_OPERATOR, "Vodafone");
+                    break;
+                case 23494:
+                    p.set(Position.KEY_OPERATOR, "Three");
+                    break;
+				default:
+                    p.set(Position.KEY_OPERATOR, b.readUnsignedInt());
+                    break;	
+            }
+        });
+        register(252, fmbXXX, (p, b) -> p.set("unplugged", b.readUnsignedByte() > 0));
         register(253, null, (p, b) -> {
             switch (b.readUnsignedByte()) {
                 case 1:
@@ -300,7 +364,6 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         });
         register(390, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_LEVEL, b.readUnsignedInt()));
         register(636, fmbXXX, (p, b) -> p.set("cid4g", b.readUnsignedInt()));
-        register(390, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_LEVEL, b.readUnsignedInt() * 0.1 ));
     }
 
     private void decodeGh3000Parameter(Position position, int id, ByteBuf buf, int length) {
