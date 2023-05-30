@@ -298,6 +298,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
             }
         });
         register(636, fmbXXX, (p, b) -> p.set("cid4g", b.readUnsignedInt()));
+        register(390, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_LEVEL, b.readUnsignedInt() * 0.1 ));
     }
 
     private void decodeGh3000Parameter(Position position, int id, ByteBuf buf, int length) {
