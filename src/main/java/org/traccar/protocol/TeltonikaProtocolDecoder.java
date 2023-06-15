@@ -211,6 +211,8 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                 "FMB001", "FMB010", "FMB002", "FMB020", "FMB003", "FMB110", "FMB120", "FMB122", "FMB125", "FMB130",
                 "FMB140", "FMU125", "FMB900", "FMB920", "FMB962", "FMB964", "FM3001", "FMB202", "FMB204", "FMB206",
                 "FMT100", "MTB100", "FMP100", "MSP500");
+        var tmtXXX = Set.of(
+                "TMT250", "GH5200");        
 
         register(1, null, (p, b) -> p.set(Position.PREFIX_IN + 1, b.readUnsignedByte() > 0));
         register(2, null, (p, b) -> p.set(Position.PREFIX_IN + 2, b.readUnsignedByte() > 0));
@@ -276,7 +278,8 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(90, null, (p, b) -> p.set(Position.KEY_DOOR, b.readUnsignedShort()));
         register(110, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_CONSUMPTION, b.readUnsignedShort() * 0.1));
         register(113, fmbXXX, (p, b) -> p.set(Position.KEY_BATTERY_LEVEL, b.readUnsignedByte()));
-        register(115, fmbXXX, (p, b) -> p.set("engineTemp", b.readShort() * 0.1));
+        register(115, fmbXXX, (p, b) -> p.set(Position.KEY_ENGINE_TEMP, b.readShort() * 0.1));
+        register(116, tmtXXX, (p, b) -> p.set(Position.KEY_CHARGE, b.readUnsignedByte()));
         register(179, null, (p, b) -> p.set(Position.PREFIX_OUT + 1, b.readUnsignedByte() > 0));
         register(180, null, (p, b) -> p.set(Position.PREFIX_OUT + 2, b.readUnsignedByte() > 0));
         register(181, null, (p, b) -> p.set(Position.KEY_PDOP, b.readUnsignedShort() * 0.1));
@@ -358,7 +361,6 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                     break;	
             }
         });
-        register(241, null, (p, b) -> p.set(Position.KEY_OPERATOR, b.readUnsignedInt()));
         register(246, fmbXXX, (p, b) -> {
             p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_TOW : null);
         });
@@ -384,7 +386,8 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                     break;
             }
         });
-        register(390, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_LEVEL, b.readUnsignedInt()));
+        register(390, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_LEVEL, b.readUnsignedInt() * 0.1 ));
+        register(390, tmtXXX, (p, b) -> p.set(Position.KEY_STATUS, b.readUnsignedInt()));
         register(636, fmbXXX, (p, b) -> p.set("cid4g", b.readUnsignedInt()));
     }
 
