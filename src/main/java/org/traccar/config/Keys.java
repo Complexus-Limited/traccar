@@ -761,12 +761,12 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
-     * WebSocket connection timeout in milliseconds. Default timeout is 10 minutes.
+     * WebSocket connection timeout in milliseconds. Default timeout is 5 minutes.
      */
     public static final ConfigKey<Long> WEB_TIMEOUT = new LongConfigKey(
             "web.timeout",
             List.of(KeyType.CONFIG),
-            60000L);
+            300000L);
 
     /**
      * Authentication sessions timeout in seconds. By default no timeout.
@@ -1756,6 +1756,14 @@ public final class Keys {
             "time,position,speed,course,accuracy,result");
 
     /**
+     * Broadcast method. Available options are "multicast" and "redis". By default (if the value is not
+     * specified or does not matches available options) server disables broadcast.
+     */
+    public static final ConfigKey<String> BROADCAST_TYPE = new StringConfigKey(
+            "broadcast.type",
+            List.of(KeyType.CONFIG));
+
+    /**
      * Multicast interface. It can be either an IP address or an interface name.
      */
     public static final ConfigKey<String> BROADCAST_INTERFACE = new StringConfigKey(
@@ -1763,7 +1771,7 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
-     * Multicast address for broadcasting synchronization events.
+     * Multicast address or Redis URL for broadcasting synchronization events.
      */
     public static final ConfigKey<String> BROADCAST_ADDRESS = new StringConfigKey(
             "broadcast.address",
