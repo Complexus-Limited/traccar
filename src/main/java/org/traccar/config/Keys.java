@@ -234,11 +234,18 @@ public final class Keys {
             List.of(KeyType.CONFIG, KeyType.DEVICE));
 
     /**
+     * Disable commands for the protocol. Not all protocols support this option.
+     */
+    public static final ConfigSuffix<Boolean> PROTOCOL_DISABLE_COMMANDS = new BooleanConfigSuffix(
+            ".disableCommands",
+            List.of(KeyType.CONFIG));
+
+    /**
      * Protocol format. Used by protocols that have configurable message format.
      */
     public static final ConfigSuffix<String> PROTOCOL_FORMAT = new StringConfigSuffix(
             ".format",
-            List.of(KeyType.DEVICE));
+            List.of(KeyType.CONFIG, KeyType.DEVICE));
 
     /**
      * Protocol date format. Used by protocols that have configurable date format.
@@ -739,6 +746,14 @@ public final class Keys {
             List.of(KeyType.CONFIG));
 
     /**
+     * Maximum API request duration in seconds.
+     */
+    public static final ConfigKey<Integer> WEB_MAX_REQUEST_SECONDS = new IntegerConfigKey(
+            "web.maxRequestSec",
+            List.of(KeyType.CONFIG),
+            600);
+
+    /**
      * Sanitize all strings returned via API. This is needed to fix XSS issues in the old web interface. New React-based
      * interface doesn't require this.
      */
@@ -829,7 +844,15 @@ public final class Keys {
             "url");
 
     /**
-     * Position forwarding Kafka topic.
+     * Position forwarding AMQP exchange.
+     */
+    public static final ConfigKey<String> FORWARD_EXCHANGE = new StringConfigKey(
+            "forward.exchange",
+            List.of(KeyType.CONFIG),
+            "traccar");
+
+    /**
+     * Position forwarding Kafka topic or AQMP Routing Key.
      */
     public static final ConfigKey<String> FORWARD_TOPIC = new StringConfigKey(
             "forward.topic",
@@ -898,7 +921,15 @@ public final class Keys {
             "json");
 
     /**
-     * Events forwarding Kafka topic.
+     * Events forwarding AMQP exchange.
+     */
+    public static final ConfigKey<String> EVENT_FORWARD_EXCHANGE = new StringConfigKey(
+            "event.forward.exchange",
+            List.of(KeyType.CONFIG),
+            "traccar");
+
+    /**
+     * Events forwarding Kafka topic or AQMP Routing Key.
      */
     public static final ConfigKey<String> EVENT_FORWARD_TOPIC = new StringConfigKey(
             "event.forward.topic",
@@ -1325,6 +1356,13 @@ public final class Keys {
      */
     public static final ConfigKey<Integer> FILTER_MIN_PERIOD = new IntegerConfigKey(
             "filter.minPeriod",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * Filter position if the daily limit is exceeded for the device.
+     */
+    public static final ConfigKey<Integer> FILTER_DAILY_LIMIT = new IntegerConfigKey(
+            "filter.dailyLimit",
             List.of(KeyType.CONFIG));
 
     /**

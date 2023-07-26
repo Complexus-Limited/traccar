@@ -20,6 +20,7 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
+import org.traccar.helper.BufferUtil;
 import org.traccar.session.DeviceSession;
 import org.traccar.NetworkMessage;
 import org.traccar.Protocol;
@@ -95,7 +96,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
     public static final int MSG_INFO = 0x94;
     public static final int MSG_SERIAL = 0x9B;
     public static final int MSG_STRING_INFO = 0x21;
-    public static final int MSG_GPS_2 = 0xA0;              // GK310
+    public static final int MSG_GPS_LBS_7 = 0xA0;          // GK310 & JM-VL03
     public static final int MSG_LBS_2 = 0xA1;              // GK310
     public static final int MSG_WIFI_3 = 0xA2;             // GK310
     public static final int MSG_FENCE_SINGLE = 0xA3;       // GK310
@@ -169,7 +170,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
             case MSG_GPS_LBS_STATUS_4:
             case MSG_GPS_PHONE:
             case MSG_GPS_LBS_EXTEND:
-            case MSG_GPS_2:
+            case MSG_GPS_LBS_7:
             case MSG_FENCE_SINGLE:
             case MSG_FENCE_MULTI:
                 return true;
@@ -191,7 +192,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
             case MSG_GPS_LBS_STATUS_2:
             case MSG_GPS_LBS_STATUS_3:
             case MSG_GPS_LBS_STATUS_4:
-            case MSG_GPS_2:
+            case MSG_GPS_LBS_7:
             case MSG_FENCE_SINGLE:
             case MSG_FENCE_MULTI:
             case MSG_LBS_ALARM:
@@ -344,13 +345,13 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
             mnc = buf.readUnsignedByte();
         }
         int lac;
-        if (type == MSG_LBS_ALARM) {
+        if (type == MSG_LBS_ALARM || type == MSG_GPS_LBS_7) {
             lac = buf.readInt();
         } else {
             lac = buf.readUnsignedShort();
         }
         long cid;
-        if (type == MSG_LBS_ALARM) {
+        if (type == MSG_LBS_ALARM || type == MSG_GPS_LBS_7) {
             cid = buf.readLong();
         } else if (type == MSG_GPS_LBS_6) {
             cid = buf.readUnsignedInt();
@@ -806,7 +807,11 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
             }
 
             if (hasLbs(type) && buf.readableBytes() > 6) {
-                decodeLbs(position, buf, type, hasStatus(type) && type != MSG_LBS_ALARM && type != MSG_LBS_STATUS);
+                boolean hasLength = hasStatus(type)
+                        && type != MSG_LBS_STATUS
+                        && type != MSG_LBS_ALARM
+                        && (type != MSG_GPS_LBS_STATUS_1 || variant != Variant.VXT01);
+                decodeLbs(position, buf, type, hasLength);
             }
 
             if (hasStatus(type)) {
@@ -824,8 +829,16 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                 } else {
                     position.set(Position.KEY_BATTERY_LEVEL, buf.readUnsignedByte() * 100 / 6);
                     position.set(Position.KEY_RSSI, buf.readUnsignedByte());
-                    position.set(Position.KEY_ALARM, decodeAlarm(buf.readUnsignedByte()));
+                    short alarmExtension = buf.readUnsignedByte();
+                    if (variant != Variant.VXT01) {
+                        position.set(Position.KEY_ALARM, decodeAlarm(alarmExtension));
+                    }
                 }
+            }
+
+            if (type == MSG_STATUS && variant == Variant.VXT01) {
+                position.set(Position.KEY_POWER, buf.readUnsignedShort() * 0.01);
+                position.set(Position.KEY_RSSI, buf.readUnsignedByte());
             }
 
             if (type == MSG_GPS_LBS_1) {
@@ -904,6 +917,12 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                         buf.skipBytes(subLength);
                         break;
                 }
+            }
+
+            if (type == MSG_GPS_LBS_7) {
+                position.set(Position.KEY_IGNITION, buf.readUnsignedByte() > 0);
+                buf.readUnsignedByte(); // upload mode
+                position.set(Position.KEY_ARCHIVE, buf.readUnsignedByte() > 0 ? true : null);
             }
 
             if (buf.readableBytes() == 4 + 6) {
@@ -1370,19 +1389,13 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
             getLastLocation(position, null);
 
             buf.readUnsignedByte(); // external device type code
-            int length = buf.readableBytes() - 9; // line break + checksum + index + checksum + footer
 
-            if (length <= 0) {
-                return null;
-            } else if (length < 8) {
-                position.set(
-                        Position.PREFIX_TEMP + 1,
-                        Double.parseDouble(buf.readCharSequence(length - 1, StandardCharsets.US_ASCII).toString()));
+            ByteBuf data = buf.readSlice(buf.readableBytes() - 6); // index + checksum + footer
+            if (BufferUtil.isPrintable(data, data.readableBytes())) {
+                String value = data.readCharSequence(data.readableBytes(), StandardCharsets.US_ASCII).toString();
+                position.set(Position.KEY_RESULT, value.trim());
             } else {
-                buf.readUnsignedByte(); // card type
-                position.set(
-                        Position.KEY_DRIVER_UNIQUE_ID,
-                        buf.readCharSequence(length - 1, StandardCharsets.US_ASCII).toString());
+                position.set(Position.KEY_RESULT, ByteBufUtil.hexDump(data));
             }
 
             return position;
@@ -1407,6 +1420,8 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
         if (header == 0x7878 && type == MSG_GPS_LBS_1 && length == 0x24) {
             variant = Variant.VXT01;
         } else if (header == 0x7878 && type == MSG_GPS_LBS_STATUS_1 && length == 0x24) {
+            variant = Variant.VXT01;
+        } else if (header == 0x7878 && type == MSG_STATUS && length == 0x0a) {
             variant = Variant.VXT01;
         } else if (header == 0x7878 && type == MSG_LBS_MULTIPLE_3 && length == 0x31) {
             variant = Variant.WANWAY_S20;
