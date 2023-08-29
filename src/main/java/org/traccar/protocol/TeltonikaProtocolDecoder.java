@@ -360,6 +360,9 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
             p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_JAMMING : null);
         });
         register(252, fmbXXX, (p, b) -> p.set("unplugged", b.readUnsignedByte() > 0));
+        register(252, null, (p, b) -> {
+            p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_REMOVING : null);
+        });
         register(253, null, (p, b) -> {
             switch (b.readUnsignedByte()) {
                 case 1:
