@@ -216,7 +216,31 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(17, null, (p, b) -> p.set("axisX", b.readShort()));
         register(18, null, (p, b) -> p.set("axisY", b.readShort()));
         register(19, null, (p, b) -> p.set("axisZ", b.readShort()));
-        register(21, null, (p, b) -> p.set(Position.KEY_RSSI, b.readUnsignedByte()));
+        register(21, null, (p, b) -> {
+            switch (b.readUnsignedByte()) {
+                case 0:
+                    p.set(Position.KEY_RSSI, 0 );
+                    break;
+                case 1:    
+                    p.set(Position.KEY_RSSI, 20 );
+                    break;
+                case 2:    
+                    p.set(Position.KEY_RSSI, 40 );
+                    break;
+                case 3:    
+                    p.set(Position.KEY_RSSI, 60 );
+                    break;
+                case 4:    
+                    p.set(Position.KEY_RSSI, 80 );
+                    break;
+                case 5:    
+                    p.set(Position.KEY_RSSI, 100 );
+                    break;
+                default:
+                    p.set(Position.KEY_RSSI, b.readUnsignedByte());
+                    break;
+                }
+        });
         register(24, fmbXXX, (p, b) -> p.setSpeed(UnitsConverter.knotsFromKph(b.readUnsignedShort())));
         register(25, null, (p, b) -> p.set("bleTemp1", b.readShort() * 0.01));
         register(26, null, (p, b) -> p.set("bleTemp2", b.readShort() * 0.01));
