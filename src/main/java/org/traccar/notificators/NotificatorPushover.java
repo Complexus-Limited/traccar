@@ -15,7 +15,9 @@
  */
 package org.traccar.notificators;
 
+import org.traccar.helper.WebHelper;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import org.traccar.config.Config;
 import org.traccar.config.Keys;
 import org.traccar.model.Event;
@@ -34,7 +36,8 @@ public class NotificatorPushover implements Notificator {
 
     private final NotificationFormatter notificationFormatter;
     private final Client client;
-
+    
+    private final String pushoverurl;
     private final String url;
     private final String token;
     private final String user;
@@ -50,16 +53,30 @@ public class NotificatorPushover implements Notificator {
         private String title;
         @JsonProperty("message")
         private String message;
+        @JsonProperty("priority")
+        private Integer priority;
+        @JsonProperty("url")
+        private String url;
+        @JsonProperty("urltitle")
+        private String urltitle;
+        @JsonProperty("retry")
+        private Integer retry;
+        @JsonProperty("expire")
+        private Integer expire;
+        @JsonProperty("sound")
+        private String sound;
     }
 
     @Inject
     public NotificatorPushover(Config config, NotificationFormatter notificationFormatter, Client client) {
         this.notificationFormatter = notificationFormatter;
         this.client = client;
-        url = "https://api.pushover.net/1/messages.json";
+        pushoverurl = "https://api.pushover.net/1/messages.json";
         token = config.getString(Keys.NOTIFICATOR_PUSHOVER_TOKEN);
         user = config.getString(Keys.NOTIFICATOR_PUSHOVER_USER);
+        url = WebHelper.retrieveWebUrl(config);
     }
+
 
     @Override
     public void send(Notification notification, User user, Event event, Position position) {
@@ -79,8 +96,13 @@ public class NotificatorPushover implements Notificator {
 
         message.title = shortMessage.getSubject();
         message.message = shortMessage.getBody();
+        message.url = url;
+        message.priority = 2;
+        message.retry = 60;
+        message.expire = 300;
+        message.sound = "persistent";
 
-        client.target(url).request().post(Entity.json(message)).close();
+        client.target(pushoverurl).request().post(Entity.json(message)).close();
     }
 
 }
