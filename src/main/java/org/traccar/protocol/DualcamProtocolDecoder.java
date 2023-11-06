@@ -19,6 +19,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
+import org.traccar.model.Device;
 import org.traccar.session.DeviceSession;
 import org.traccar.NetworkMessage;
 import org.traccar.Protocol;
@@ -45,11 +46,20 @@ public class DualcamProtocolDecoder extends BaseProtocolDecoder {
     public static final int MSG_PATH_REQUEST = 0x000C;
     public static final int MSG_PATH_RESPONSE = 0x000D;
 
+    private String model;
     private String uniqueId;
-    private int packetCount;
-    private int currentPacket;
+    private int dataSize;
+    private int dataCurrent;
     private boolean video;
     private ByteBuf media;
+
+    private boolean isPacketData() {
+        if (model == null) {
+            return dataSize < 8192;
+        } else {
+            return !"DSM".equals(model);
+        }
+    }
 
     @Override
     protected Object decode(
@@ -59,13 +69,15 @@ public class DualcamProtocolDecoder extends BaseProtocolDecoder {
 
         int type = buf.readUnsignedShort();
 
+        DeviceSession deviceSession;
         switch (type) {
             case MSG_INIT:
                 buf.readUnsignedShort(); // protocol id
                 uniqueId = String.valueOf(buf.readLong());
-                DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, uniqueId);
+                deviceSession = getDeviceSession(channel, remoteAddress, uniqueId);
                 long settings = buf.readUnsignedInt();
                 if (channel != null && deviceSession != null) {
+                    model = getCacheManager().getObject(Device.class, deviceSession.getDeviceId()).getModel();
                     ByteBuf response = Unpooled.buffer();
                     if (BitUtil.check(settings, 25)) {
                         response.writeShort(MSG_PATH_REQUEST);
@@ -97,21 +109,29 @@ public class DualcamProtocolDecoder extends BaseProtocolDecoder {
                 break;
             case MSG_START:
                 buf.readUnsignedShort(); // length
-                packetCount = buf.readInt();
-                currentPacket = 1;
+                dataSize = buf.readInt();
+                dataCurrent = isPacketData() ? 1 : 0;
                 media = Unpooled.buffer();
                 if (channel != null) {
                     ByteBuf response = Unpooled.buffer();
                     response.writeShort(MSG_RESUME);
                     response.writeShort(4);
-                    response.writeInt(currentPacket);
+                    response.writeInt(dataCurrent);
                     channel.writeAndFlush(new NetworkMessage(response, remoteAddress));
                 }
                 break;
             case MSG_DATA:
-                buf.readUnsignedShort(); // length
-                media.writeBytes(buf, buf.readableBytes() - 2);
-                if (currentPacket == packetCount) {
+                int length = buf.readUnsignedShort() - 2;
+                media.writeBytes(buf, length);
+                boolean finished;
+                if (isPacketData()) {
+                    finished = dataCurrent == dataSize;
+                    dataCurrent += 1;
+                } else {
+                    finished = dataCurrent + length == dataSize;
+                    dataCurrent += length;
+                }
+                if (finished) {
                     deviceSession = getDeviceSession(channel, remoteAddress);
                     Position position = new Position(getProtocolName());
                     position.setDeviceId(deviceSession.getDeviceId());
@@ -132,8 +152,6 @@ public class DualcamProtocolDecoder extends BaseProtocolDecoder {
                         channel.writeAndFlush(new NetworkMessage(response, remoteAddress));
                     }
                     return position;
-                } else {
-                    currentPacket += 1;
                 }
                 break;
             case MSG_PATH_RESPONSE:
