@@ -94,6 +94,7 @@ public class Position extends Message {
     public static final String KEY_PHONE = "phone";
     public static final String KEY_SPEED_LIMIT = "speedLimit";
     public static final String KEY_DRIVING_TIME = "drivingTime";
+    public static final String KEY_UNPLUGGED = "unplugged";
 
     public static final String KEY_DTCS = "dtcs";
     public static final String KEY_OBD_SPEED = "obdSpeed"; // knots

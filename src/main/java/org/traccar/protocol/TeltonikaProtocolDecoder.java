@@ -241,7 +241,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                     break;
                 }
         });
-        register(24, fmbXXX, (p, b) -> p.setSpeed(UnitsConverter.knotsFromKph(b.readUnsignedShort())));
+        register(24, null, (p, b) -> p.setSpeed(UnitsConverter.knotsFromKph(b.readUnsignedShort())));
         register(25, null, (p, b) -> p.set("bleTemp1", b.readShort() * 0.01));
         register(26, null, (p, b) -> p.set("bleTemp2", b.readShort() * 0.01));
         register(27, null, (p, b) -> p.set("bleTemp3", b.readShort() * 0.01));
@@ -383,9 +383,22 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(249, fmbXXX, (p, b) -> {
             p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_JAMMING : null);
         });
-        register(252, fmbXXX, (p, b) -> p.set("unplugged", b.readUnsignedByte() > 0));
+        //register(252, fmbXXX, (p, b) -> p.set(Position.KEY_UNPLUGGED, b.readUnsignedByte()));
+         //p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_REMOVING : null);
+            //p.set(Position.KEY_UNPLUGGED, b.readUnsignedByte());
         register(252, null, (p, b) -> {
-            p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_REMOVING : null);
+            switch (b.readUnsignedByte()) {
+                case 0: 
+                    p.set(Position.KEY_UNPLUGGED,0);
+                    break;
+                case 1:
+                    p.set(Position.KEY_ALARM, Position.ALARM_REMOVING);
+                    p.set(Position.KEY_UNPLUGGED,1);
+                    break;
+                default:
+                    p.set(Position.KEY_UNPLUGGED,0);
+                    break;
+            }
         });
         register(253, null, (p, b) -> {
             switch (b.readUnsignedByte()) {
