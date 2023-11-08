@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 - 2022 Anton Tananaev (anton@traccar.org)
+ * Copyright 2019 - 2023 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -838,6 +838,20 @@ public final class Keys {
             "max-age=3600,public");
 
     /**
+     * Enable TOTP authentication on the server.
+     */
+    public static final ConfigKey<Boolean> WEB_TOTP_ENABLE = new BooleanConfigKey(
+            "totpEnable",
+            List.of(KeyType.SERVER));
+
+    /**
+     * Server attribute that indicates that TOTP authentication is required for new users.
+     */
+    public static final ConfigKey<Boolean> WEB_TOTP_FORCE = new BooleanConfigKey(
+            "totpForce",
+            List.of(KeyType.SERVER));
+
+    /**
      * Host for raw data forwarding.
      */
     public static final ConfigKey<String> SERVER_FORWARD = new StringConfigKey(
@@ -1482,10 +1496,17 @@ public final class Keys {
             List.of(KeyType.CONFIG, KeyType.DEVICE));
 
     /**
-     * Enable computed attributes processing.
+     * Include device attributes in the computed attribute context.
      */
     public static final ConfigKey<Boolean> PROCESSING_COMPUTED_ATTRIBUTES_DEVICE_ATTRIBUTES = new BooleanConfigKey(
             "processing.computedAttributes.deviceAttributes",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * Include last position attributes in the computed attribute context.
+     */
+    public static final ConfigKey<Boolean> PROCESSING_COMPUTED_ATTRIBUTES_LAST_ATTRIBUTES = new BooleanConfigKey(
+            "processing.computedAttributes.lastAttributes",
             List.of(KeyType.CONFIG));
 
     /**
@@ -1640,6 +1661,13 @@ public final class Keys {
      */
     public static final ConfigKey<Boolean> GEOLOCATION_REUSE = new BooleanConfigKey(
             "geolocation.reuse",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * Process geolocation only when Wi-Fi information is available. This makes the result more accurate.
+     */
+    public static final ConfigKey<Boolean> GEOLOCATION_REQUIRE_WIFI = new BooleanConfigKey(
+            "geolocation.requireWifi",
             List.of(KeyType.CONFIG));
 
     /**
