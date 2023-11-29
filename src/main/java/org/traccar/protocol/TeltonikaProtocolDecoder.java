@@ -374,6 +374,20 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                     break;	
             }
         });
+        register(242, null, (p, b) -> {
+            switch (b.readUnsignedByte()) {
+                case 0: 
+                    p.set(Position.KEY_MAN_DOWN,0);
+                    break;
+                case 1:
+                    p.set(Position.KEY_ALARM, Position.ALARM_FALL_DOWN);
+                    p.set(Position.KEY_MAN_DOWN,1);
+                    break;
+                default:
+                    p.set(Position.KEY_MAN_DOWN,0);
+                    break;
+            }
+        });
         register(246, fmbXXX, (p, b) -> {
             p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_TOW : null);
         });
@@ -383,9 +397,6 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(249, fmbXXX, (p, b) -> {
             p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_JAMMING : null);
         });
-        //register(252, fmbXXX, (p, b) -> p.set(Position.KEY_UNPLUGGED, b.readUnsignedByte()));
-         //p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_REMOVING : null);
-            //p.set(Position.KEY_UNPLUGGED, b.readUnsignedByte());
         register(252, null, (p, b) -> {
             switch (b.readUnsignedByte()) {
                 case 0: 
@@ -415,8 +426,74 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                     break;
             }
         });
+        register(389, tmtXXX, (p, b) -> {
+            String X,Y;
+            String button_combo = ByteBufUtil.hexDump(b.readSlice(1));
+            int button = Integer.parseInt(button_combo.substring(0,1));
+            switch(button) {
+                case 1:
+                    X = "Alarm button";
+                    break;
+                case 2:
+                    X = "Power button";
+                    break;
+                case 3:
+                    X = "Button 1";
+                    break;
+                case 4:
+                    X = "Button 2";
+                    break;
+                case 5:
+                    X = "Button 3";
+                    break;
+                default:
+                    X = "Uknown button";
+                    break;
+            }
+            int action = Integer.parseInt(button_combo.substring(1,2));
+            switch(action) {
+                case 1:
+                    Y = "single click";
+                    break;
+                case 2:
+                    Y = "double click";
+                    break;
+                case 3:
+                    Y = "long click";
+                    break;
+                default:
+                    Y = "uknown action";
+                    break;
+            }
+        p.set(Position.KEY_BUTTON_PRESS, X + " " + Y);
+        });
         register(390, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_LEVEL, b.readUnsignedInt() * 0.1 ));
         register(390, tmtXXX, (p, b) -> p.set(Position.KEY_STATUS, b.readUnsignedInt()));
+        register(400, tmtXXX, (p, b) -> {
+        switch (b.readUnsignedByte()) {
+                case 0: 
+                    p.set(Position.KEY_AMBER_ALERT_STATE,"Off");
+                    break;
+                case 1:
+                    p.set(Position.KEY_AMBER_ALERT_STATE,"Timer On");
+                    p.set(Position.KEY_ALARM, Position.ALARM_AMBER_ON);
+                    break;
+                case 2:
+                    p.set(Position.KEY_AMBER_ALERT_STATE,"Timer Reset");
+                    p.set(Position.KEY_ALARM, Position.ALARM_AMBER_TIMER_RESET);
+                    break;
+                case 3: 
+                    p.set(Position.KEY_AMBER_ALERT_STATE, "Timer Exceeded");
+                    p.set(Position.KEY_ALARM, Position.ALARM_AMBER_ALERT);
+                    break;
+                case 4:
+                    p.set(Position.KEY_AMBER_ALERT_STATE, "No Timer");  
+                    break;         
+                default:
+                    p.set(Position.KEY_AMBER_ALERT_STATE,"N/A");
+                    break;
+                }
+        });                 
         register(636, fmbXXX, (p, b) -> p.set("cid4g", b.readUnsignedInt()));
     }
 
