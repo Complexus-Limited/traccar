@@ -43,14 +43,14 @@ public final class LogAction {
     private static final String ACTION_LOGIN = "login";
     private static final String ACTION_LOGOUT = "logout";
 
-    private static final String ACTION_DEVICE_ACCUMULATORS = "resetDeviceAccumulators";
+    private static final String ACTION_ACCUMULATORS = "accumulators";
 
     private static final String PATTERN_OBJECT = "user: %d, action: %s, object: %s, id: %d";
     private static final String PATTERN_LINK = "user: %d, action: %s, owner: %s, id: %d, property: %s, id: %d";
     private static final String PATTERN_LOGIN = "user: %d, action: %s, from: %s";
     private static final String PATTERN_LOGIN_FAILED = "login failed from: %s";
-    private static final String PATTERN_DEVICE_ACCUMULATORS = "user: %d, action: %s, deviceId: %d";
-    private static final String PATTERN_REPORT = "user: %d, report: %s, from: %s, to: %s, devices: %s, groups: %s";
+    private static final String PATTERN_ACCUMULATORS = "user: %d, action: %s, deviceId: %d";
+    private static final String PATTERN_REPORT = "user: %d, %s: %s, from: %s, to: %s, devices: %s, groups: %s";
 
     public static void create(long userId, BaseModel object) {
         logObjectAction(ACTION_CREATE, userId, object.getClass(), object.getId());
@@ -87,9 +87,9 @@ public final class LogAction {
         LOGGER.info(String.format(PATTERN_LOGIN_FAILED, remoteAddress));
     }
 
-    public static void resetDeviceAccumulators(long userId, long deviceId) {
+    public static void resetAccumulators(long userId, long deviceId) {
         LOGGER.info(String.format(
-                PATTERN_DEVICE_ACCUMULATORS, userId, ACTION_DEVICE_ACCUMULATORS, deviceId));
+                PATTERN_ACCUMULATORS, userId, ACTION_ACCUMULATORS, deviceId));
     }
 
     private static void logObjectAction(String action, long userId, Class<?> clazz, long objectId) {
@@ -113,10 +113,11 @@ public final class LogAction {
     }
 
     public static void logReport(
-            long userId, String report, Date from, Date to, List<Long> deviceIds, List<Long> groupIds) {
+            long userId, boolean scheduled, String report,
+            Date from, Date to, List<Long> deviceIds, List<Long> groupIds) {
         DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         LOGGER.info(String.format(
-                PATTERN_REPORT, userId, report,
+                PATTERN_REPORT, userId, scheduled ? "scheduled" : "report", report,
                 dateFormat.format(from), dateFormat.format(to),
                 deviceIds.toString(), groupIds.toString()));
     }

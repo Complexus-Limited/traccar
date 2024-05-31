@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 - 2022 Anton Tananaev (anton@traccar.org)
+ * Copyright 2015 - 2024 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ import jakarta.ws.rs.FormParam;
 import org.traccar.api.BaseObjectResource;
 import org.traccar.api.signature.TokenManager;
 import org.traccar.broadcast.BroadcastService;
+import org.traccar.config.Config;
+import org.traccar.config.Keys;
 import org.traccar.database.MediaManager;
 import org.traccar.helper.LogAction;
 import org.traccar.model.Device;
@@ -59,6 +61,12 @@ import java.util.List;
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class DeviceResource extends BaseObjectResource<Device> {
+
+    private static final int DEFAULT_BUFFER_SIZE = 8192;
+    private static final int IMAGE_SIZE_LIMIT = 500000;
+
+    @Inject
+    private Config config;
 
     @Inject
     private CacheManager cacheManager;
@@ -128,11 +136,9 @@ public class DeviceResource extends BaseObjectResource<Device> {
 
     @Path("{id}/accumulators")
     @PUT
-    public Response updateAccumulators(DeviceAccumulators entity) throws StorageException {
-        if (permissionsService.notAdmin(getUserId())) {
-            permissionsService.checkManager(getUserId());
-            permissionsService.checkPermission(Device.class, getUserId(), entity.getDeviceId());
-        }
+    public Response updateAccumulators(DeviceAccumulators entity) throws Exception {
+        permissionsService.checkEdit(getUserId(), Device.class, false);
+        permissionsService.checkPermission(Device.class, getUserId(), entity.getDeviceId());
 
         Position position = storage.getObject(Position.class, new Request(
                 new Columns.All(), new Condition.LatestPositions(entity.getDeviceId())));
@@ -163,8 +169,25 @@ public class DeviceResource extends BaseObjectResource<Device> {
             throw new IllegalArgumentException();
         }
 
-        LogAction.resetDeviceAccumulators(getUserId(), entity.getDeviceId());
+        LogAction.resetAccumulators(getUserId(), entity.getDeviceId());
         return Response.noContent().build();
+    }
+
+    private String imageExtension(String type) {
+        switch (type) {
+            case "image/jpeg":
+                return "jpg";
+            case "image/png":
+                return "png";
+            case "image/gif":
+                return "gif";
+            case "image/webp":
+                return "webp";
+            case "image/svg+xml":
+                return "svg";
+            default:
+                throw new IllegalArgumentException("Unsupported image type");
+        }
     }
 
     @Path("{id}/image")
@@ -181,10 +204,20 @@ public class DeviceResource extends BaseObjectResource<Device> {
                         new Condition.Permission(User.class, getUserId(), Device.class))));
         if (device != null) {
             String name = "device";
-            String extension = type.substring("image/".length());
+            String extension = imageExtension(type);
             try (var input = new FileInputStream(file);
                     var output = mediaManager.createFileStream(device.getUniqueId(), name, extension)) {
-                input.transferTo(output);
+
+                long transferred = 0;
+                byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
+                int read;
+                while ((read = input.read(buffer, 0, buffer.length)) >= 0) {
+                    output.write(buffer, 0, read);
+                    transferred += read;
+                    if (transferred > IMAGE_SIZE_LIMIT) {
+                        throw new IllegalArgumentException("Image size limit exceeded");
+                    }
+                }
             }
             return Response.ok(name + "." + extension).build();
         }
@@ -199,6 +232,15 @@ public class DeviceResource extends BaseObjectResource<Device> {
             @FormParam("expiration") Date expiration) throws StorageException, GeneralSecurityException, IOException {
 
         User user = permissionsService.getUser(getUserId());
+        if (permissionsService.getServer().getBoolean(Keys.DEVICE_SHARE_DISABLE.getKey())) {
+            throw new SecurityException("Sharing is disabled");
+        }
+        if (user.getTemporary()) {
+            throw new SecurityException("Temporary user");
+        }
+        if (user.getExpirationTime() != null && user.getExpirationTime().before(expiration)) {
+            expiration = user.getExpirationTime();
+        }
 
         Device device = storage.getObject(Device.class, new Request(
                 new Columns.All(),
@@ -206,16 +248,24 @@ public class DeviceResource extends BaseObjectResource<Device> {
                         new Condition.Equals("id", deviceId),
                         new Condition.Permission(User.class, user.getId(), Device.class))));
 
-        User share = new User();
-        share.setName(device.getName());
-        share.setEmail(user.getEmail() + ":" + device.getUniqueId());
-        share.setExpirationTime(expiration);
-        share.setTemporary(true);
-        share.setReadonly(true);
+        String shareEmail = user.getEmail() + ":" + device.getUniqueId();
+        User share = storage.getObject(User.class, new Request(
+                new Columns.All(), new Condition.Equals("email", shareEmail)));
 
-        share.setId(storage.addObject(share, new Request(new Columns.Exclude("id"))));
+        if (share == null) {
+            share = new User();
+            share.setName(device.getName());
+            share.setEmail(shareEmail);
+            share.setExpirationTime(expiration);
+            share.setTemporary(true);
+            share.setReadonly(true);
+            share.setLimitCommands(user.getLimitCommands() || !config.getBoolean(Keys.WEB_SHARE_DEVICE_COMMANDS));
+            share.setDisableReports(user.getDisableReports() || !config.getBoolean(Keys.WEB_SHARE_DEVICE_REPORTS));
 
-        storage.addPermission(new Permission(User.class, share.getId(), Device.class, deviceId));
+            share.setId(storage.addObject(share, new Request(new Columns.Exclude("id"))));
+
+            storage.addPermission(new Permission(User.class, share.getId(), Device.class, deviceId));
+        }
 
         return tokenManager.generateToken(share.getId(), expiration);
     }

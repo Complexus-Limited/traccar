@@ -18,6 +18,10 @@ public class Gt06ProtocolDecoderTest extends ProtocolTest {
                 "78780D01086471700328358100093F040D0A"));
 
         verifyAttribute(decoder, binary(
+                "78782732180214123324ca0162bdf0041f45d900190b0a02d4000bc5270000ec025206040202005e07e10d0a"),
+                Position.KEY_ALARM, Position.ALARM_POWER_CUT);
+
+        verifyAttribute(decoder, binary(
                 "78782616170A080C0E24C0027C58AD0C2B8B0100454E0901CC0025030328E7A0005D4B13021EC373170D0A"),
                 Position.KEY_BATTERY_LEVEL, 93);
 
@@ -489,6 +493,12 @@ public class Gt06ProtocolDecoderTest extends ProtocolTest {
         verifyAttribute(decoder, binary(
                 "78785195140a020c2914055D4A800209D9C014009300004556454e545f3335333337363131303032333139365f30303030303030305f323032305f31305f30325f31345f34315f32305f30352e6d70340004e3a60d0a"),
                 Position.KEY_ALARM, Position.ALARM_ACCIDENT);
+
+        decoder.setModelOverride("LW4G-4B");
+
+        verifyAttribute(decoder, binary(
+                "78782516180516150812c804b50ee80880e40805dcf909012e000000986633460604190106c393490d0a"),
+                Position.KEY_ALARM, Position.ALARM_ACCELERATION);
 
     }
 

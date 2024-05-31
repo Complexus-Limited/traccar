@@ -23,12 +23,12 @@ import org.traccar.config.Keys;
 import org.traccar.forward.EventData;
 import org.traccar.forward.EventForwarder;
 import org.traccar.geocoder.Geocoder;
+import org.traccar.helper.DateUtil;
 import org.traccar.model.Calendar;
 import org.traccar.model.Device;
 import org.traccar.model.Event;
 import org.traccar.model.Geofence;
 import org.traccar.model.Maintenance;
-import org.traccar.model.Notification;
 import org.traccar.model.Position;
 import org.traccar.notification.MessageException;
 import org.traccar.notification.NotificatorManager;
@@ -42,8 +42,10 @@ import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Singleton
@@ -59,6 +61,7 @@ public class NotificationManager {
 
     private final boolean geocodeOnRequest;
     private final long timeThreshold;
+    private final Set<Long> blockedUsers = new HashSet<>();
 
     @Inject
     public NotificationManager(
@@ -71,6 +74,12 @@ public class NotificationManager {
         this.geocoder = geocoder;
         geocodeOnRequest = config.getBoolean(Keys.GEOCODER_ON_REQUEST);
         timeThreshold = config.getLong(Keys.NOTIFICATOR_TIME_THRESHOLD);
+        String blockedUsersString = config.getString(Keys.NOTIFICATION_BLOCK_USERS);
+        if (blockedUsersString != null) {
+            for (String userIdString : blockedUsersString.split(",")) {
+                blockedUsers.add(Long.parseLong(userIdString));
+            }
+        }
     }
 
     private void updateEvent(Event event, Position position) {
@@ -87,7 +96,7 @@ public class NotificationManager {
             return;
         }
 
-        var notifications = cacheManager.getDeviceObjects(event.getDeviceId(), Notification.class).stream()
+        var notifications = cacheManager.getDeviceNotifications(event.getDeviceId()).stream()
                 .filter(notification -> notification.getType().equals(event.getType()))
                 .filter(notification -> {
                     if (event.getType().equals(Event.TYPE_ALARM)) {
@@ -107,6 +116,14 @@ public class NotificationManager {
                 })
                 .collect(Collectors.toUnmodifiableList());
 
+        Device device = cacheManager.getObject(Device.class, event.getDeviceId());
+        LOGGER.info(
+                "Event id: {}, time: {}, type: {}, notifications: {}",
+                device.getUniqueId(),
+                DateUtil.formatDate(event.getEventTime(), false),
+                event.getType(),
+                notifications.size());
+
         if (!notifications.isEmpty()) {
             if (position != null && position.getAddress() == null && geocodeOnRequest && geocoder != null) {
                 position.setAddress(geocoder.getAddress(position.getLatitude(), position.getLongitude(), null));
@@ -114,6 +131,10 @@ public class NotificationManager {
 
             notifications.forEach(notification -> {
                 cacheManager.getNotificationUsers(notification.getId(), event.getDeviceId()).forEach(user -> {
+                    if (blockedUsers.contains(user.getId())) {
+                        LOGGER.info("User {} notification blocked", user.getId());
+                        return;
+                    }
                     for (String notificator : notification.getNotificatorsTypes()) {
                         try {
                             notificatorManager.getNotificator(notificator).send(notification, user, event, position);
@@ -153,7 +174,7 @@ public class NotificationManager {
             try {
                 cacheManager.addDevice(event.getDeviceId());
                 updateEvent(event, position);
-            } catch (StorageException e) {
+            } catch (Exception e) {
                 throw new RuntimeException(e);
             } finally {
                 cacheManager.removeDevice(event.getDeviceId());
