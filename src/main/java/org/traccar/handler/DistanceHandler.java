@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2016 - 2023 Anton Tananaev (anton@traccar.org)
  * Copyright 2015 Amila Silva
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,14 +16,19 @@
  */
 package org.traccar.handler;
 
+import io.netty.channel.ChannelHandler;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import org.traccar.BaseDataHandler;
 import org.traccar.config.Config;
 import org.traccar.config.Keys;
 import org.traccar.helper.DistanceCalculator;
 import org.traccar.model.Position;
 import org.traccar.session.cache.CacheManager;
 
-public class DistanceHandler extends BasePositionHandler {
+@Singleton
+@ChannelHandler.Sharable
+public class DistanceHandler extends BaseDataHandler {
 
     private final CacheManager cacheManager;
 
@@ -40,7 +45,7 @@ public class DistanceHandler extends BasePositionHandler {
     }
 
     @Override
-    public void handlePosition(Position position, Callback callback) {
+    protected Position handlePosition(Position position) {
 
         double distance = 0.0;
         if (position.hasAttribute(Position.KEY_DISTANCE)) {
@@ -71,7 +76,7 @@ public class DistanceHandler extends BasePositionHandler {
         position.set(Position.KEY_DISTANCE, distance);
         position.set(Position.KEY_TOTAL_DISTANCE, totalDistance + distance);
 
-        callback.processed(false);
+        return position;
     }
 
 }

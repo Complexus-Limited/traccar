@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2023 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,14 +31,13 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 @Singleton
-public class NotificatorCommand extends Notificator {
+public class NotificatorCommand implements Notificator {
 
     private final Storage storage;
     private final CommandsManager commandsManager;
 
     @Inject
     public NotificatorCommand(Storage storage, CommandsManager commandsManager) {
-        super(null, null);
         this.storage = storage;
         this.commandsManager = commandsManager;
     }

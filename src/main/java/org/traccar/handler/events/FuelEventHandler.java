@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2017 - 2023 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 package org.traccar.handler.events;
 
-import jakarta.inject.Inject;
+import io.netty.channel.ChannelHandler;
 import org.traccar.config.Keys;
 import org.traccar.helper.model.AttributeUtil;
 import org.traccar.helper.model.PositionUtil;
@@ -24,6 +24,12 @@ import org.traccar.model.Event;
 import org.traccar.model.Position;
 import org.traccar.session.cache.CacheManager;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import java.util.Map;
+
+@Singleton
+@ChannelHandler.Sharable
 public class FuelEventHandler extends BaseEventHandler {
 
     private final CacheManager cacheManager;
@@ -34,14 +40,14 @@ public class FuelEventHandler extends BaseEventHandler {
     }
 
     @Override
-    public void analyzePosition(Position position, Callback callback) {
+    protected Map<Event, Position> analyzePosition(Position position) {
 
         Device device = cacheManager.getObject(Device.class, position.getDeviceId());
         if (device == null) {
-            return;
+            return null;
         }
         if (!PositionUtil.isLatest(cacheManager, position)) {
-            return;
+            return null;
         }
 
         if (position.hasAttribute(Position.KEY_FUEL_LEVEL)) {
@@ -55,17 +61,19 @@ public class FuelEventHandler extends BaseEventHandler {
                     double threshold = AttributeUtil.lookup(
                             cacheManager, Keys.EVENT_FUEL_INCREASE_THRESHOLD, position.getDeviceId());
                     if (threshold > 0 && change >= threshold) {
-                        callback.eventDetected(new Event(Event.TYPE_DEVICE_FUEL_INCREASE, position));
+                        return Map.of(new Event(Event.TYPE_DEVICE_FUEL_INCREASE, position), position);
                     }
                 } else if (change < 0) {
                     double threshold = AttributeUtil.lookup(
                             cacheManager, Keys.EVENT_FUEL_DROP_THRESHOLD, position.getDeviceId());
                     if (threshold > 0 && Math.abs(change) >= threshold) {
-                        callback.eventDetected(new Event(Event.TYPE_DEVICE_FUEL_DROP, position));
+                        return Map.of(new Event(Event.TYPE_DEVICE_FUEL_DROP, position), position);
                     }
                 }
             }
         }
+
+        return null;
     }
 
 }

@@ -21,6 +21,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.helper.BufferUtil;
+import org.traccar.model.Device;
 import org.traccar.session.DeviceSession;
 import org.traccar.NetworkMessage;
 import org.traccar.Protocol;
@@ -33,7 +34,6 @@ import org.traccar.model.Network;
 import org.traccar.model.Position;
 
 import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
@@ -199,8 +199,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         var fmbXXX = Set.of(
                 "FMB001", "FMB010", "FMB002", "FMB020", "FMB003", "FMB110", "FMB120", "FMB122", "FMB125", "FMB130",
                 "FMB140", "FMU125", "FMB900", "FMB920", "FMB962", "FMB964", "FM3001", "FMB202", "FMB204", "FMB206",
-                "FMT100", "MTB100", "FMP100", "MSP500", "FMC125", "FMM125", "FMU130", "FMC130", "FMM130", "FMB150",
-                "FMC150", "FMM150", "FMC920");
+                "FMT100", "MTB100", "FMP100", "MSP500");
         var tmtXXX = Set.of(
                 "TMT250", "GH5200");        
 
@@ -276,8 +275,8 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(74, fmbXXX, (p, b) -> p.set(Position.PREFIX_TEMP + 3, b.readInt() * 0.1));
         register(75, fmbXXX, (p, b) -> p.set(Position.PREFIX_TEMP + 4, b.readInt() * 0.1));
         register(78, null, (p, b) -> {
-            long driverUniqueId = b.readLongLE();
-            if (driverUniqueId != 0) {
+            long driverUniqueId = b.readLong();
+            if (driverUniqueId > 0) {
                 p.set(Position.KEY_DRIVER_UNIQUE_ID, String.format("%016X", driverUniqueId));
             }
         });
@@ -289,6 +288,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(85, fmbXXX, (p, b) -> p.set(Position.KEY_RPM, b.readUnsignedShort()));
         register(87, fmbXXX, (p, b) -> p.set(Position.KEY_OBD_ODOMETER, b.readUnsignedInt()));
         register(89, fmbXXX, (p, b) -> p.set("fuelLevelPercentage", b.readUnsignedByte()));
+        register(90, null, (p, b) -> p.set(Position.KEY_DOOR, b.readUnsignedShort()));
         register(110, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_CONSUMPTION, b.readUnsignedShort() * 0.1));
         register(113, null, (p, b) -> p.set(Position.KEY_BATTERY_LEVEL, b.readUnsignedByte()));
         register(115, fmbXXX, (p, b) -> p.set(Position.KEY_ENGINE_TEMP, b.readShort() * 0.1));
@@ -397,9 +397,6 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(249, fmbXXX, (p, b) -> {
             p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_JAMMING : null);
         });
-        register(251, fmbXXX, (p, b) -> {
-            p.set(Position.KEY_ALARM, b.readUnsignedByte() > 0 ? Position.ALARM_IDLE : null);
-        });
         register(252, null, (p, b) -> {
             switch (b.readUnsignedByte()) {
                 case 0: 
@@ -498,7 +495,6 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                 }
         });                 
         register(636, fmbXXX, (p, b) -> p.set("cid4g", b.readUnsignedInt()));
-        register(662, fmbXXX, (p, b) -> p.set(Position.KEY_DOOR, b.readUnsignedByte() > 0));
     }
 
     private void decodeGh3000Parameter(Position position, int id, ByteBuf buf, int length) {
@@ -812,14 +808,8 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                                     position.set("tag" + i + "Id", beaconId);
                                     break;
                                 case 2:
-                                    ByteBuf beaconData = beacon.readSlice(parameterLength);
-                                    int flag = beaconData.readUnsignedByte();
-                                    if (BitUtil.check(flag, 6)) {
-                                        position.set("tag" + i + "LowBattery", true);
-                                    }
-                                    if (BitUtil.check(flag, 7)) {
-                                        position.set("tag" + i + "Voltage", beaconData.readUnsignedByte() * 10 + 2000);
-                                    }
+                                    String beaconData = ByteBufUtil.hexDump(beacon.readSlice(parameterLength));
+                                    position.set("tag" + i + "Data", beaconData);
                                     break;
                                 case 13:
                                     position.set("tag" + i + "LowBattery", beacon.readUnsignedByte());
@@ -841,14 +831,6 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
 
         decodeNetwork(position, model);
 
-        if (model != null && model.matches("FM.6..")) {
-            Long driverMsb = (Long) position.getAttributes().get("io195");
-            Long driverLsb = (Long) position.getAttributes().get("io196");
-            if (driverMsb != null && driverLsb != null) {
-                String driver = new String(ByteBuffer.allocate(16).putLong(driverMsb).putLong(driverLsb).array());
-                position.set(Position.KEY_DRIVER_UNIQUE_ID, driver);
-            }
-        }
     }
 
     private List<Position> parseData(
@@ -866,6 +848,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         if (deviceSession == null) {
             return null;
         }
+        String model = getCacheManager().getObject(Device.class, deviceSession.getDeviceId()).getModel();
 
         for (int i = 0; i < count; i++) {
             Position position = new Position(getProtocolName());
@@ -891,7 +874,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
             } else if (codec == CODEC_12) {
                 decodeSerial(channel, remoteAddress, deviceSession, position, buf);
             } else {
-                decodeLocation(position, buf, codec, getDeviceModel(deviceSession));
+                decodeLocation(position, buf, codec, model);
             }
 
             if (!position.getOutdated() || !position.getAttributes().isEmpty()) {

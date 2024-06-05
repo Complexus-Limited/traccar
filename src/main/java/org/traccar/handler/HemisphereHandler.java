@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2016 - 2022 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,18 @@
  */
 package org.traccar.handler;
 
-import jakarta.inject.Inject;
+import io.netty.channel.ChannelHandler;
+import org.traccar.BaseDataHandler;
 import org.traccar.config.Config;
 import org.traccar.config.Keys;
 import org.traccar.model.Position;
 
-public class HemisphereHandler extends BasePositionHandler {
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
+@Singleton
+@ChannelHandler.Sharable
+public class HemisphereHandler extends BaseDataHandler {
 
     private int latitudeFactor;
     private int longitudeFactor;
@@ -46,14 +52,14 @@ public class HemisphereHandler extends BasePositionHandler {
     }
 
     @Override
-    public void handlePosition(Position position, Callback callback) {
+    protected Position handlePosition(Position position) {
         if (latitudeFactor != 0) {
             position.setLatitude(Math.abs(position.getLatitude()) * latitudeFactor);
         }
         if (longitudeFactor != 0) {
             position.setLongitude(Math.abs(position.getLongitude()) * longitudeFactor);
         }
-        callback.processed(false);
+        return position;
     }
 
 }

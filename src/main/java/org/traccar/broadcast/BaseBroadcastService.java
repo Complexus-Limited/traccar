@@ -16,12 +16,12 @@
 package org.traccar.broadcast;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import org.traccar.model.BaseModel;
 import org.traccar.model.Device;
 import org.traccar.model.Event;
-import org.traccar.model.ObjectOperation;
 import org.traccar.model.Permission;
 import org.traccar.model.Position;
 
@@ -69,34 +69,25 @@ public abstract class BaseBroadcastService implements BroadcastService {
     }
 
     @Override
-    public <T extends BaseModel> void invalidateObject(
-            boolean local, Class<T> clazz, long id, ObjectOperation operation) {
+    public void invalidateObject(boolean local, Class<? extends BaseModel> clazz, long id) {
         BroadcastMessage message = new BroadcastMessage();
-        var invalidateObject = new BroadcastMessage.InvalidateObject();
-        invalidateObject.setClazz(Permission.getKey(clazz));
-        invalidateObject.setId(id);
-        invalidateObject.setOperation(operation);
-        message.setInvalidateObject(invalidateObject);
+        message.setChanges(Map.of(Permission.getKey(clazz), id));
         sendMessage(message);
     }
 
     @Override
-    public synchronized <T1 extends BaseModel, T2 extends BaseModel> void invalidatePermission(
-            boolean local, Class<T1> clazz1, long id1, Class<T2> clazz2, long id2, boolean link) {
+    public void invalidatePermission(
+            boolean local,
+            Class<? extends BaseModel> clazz1, long id1,
+            Class<? extends BaseModel> clazz2, long id2) {
         BroadcastMessage message = new BroadcastMessage();
-        var invalidatePermission = new BroadcastMessage.InvalidatePermission();
-        invalidatePermission.setClazz1(Permission.getKey(clazz1));
-        invalidatePermission.setId1(id1);
-        invalidatePermission.setClazz2(Permission.getKey(clazz2));
-        invalidatePermission.setId2(id2);
-        invalidatePermission.setLink(link);
-        message.setInvalidatePermission(invalidatePermission);
+        message.setChanges(Map.of(Permission.getKey(clazz1), id1, Permission.getKey(clazz2), id2));
         sendMessage(message);
     }
 
     protected abstract void sendMessage(BroadcastMessage message);
 
-    protected void handleMessage(BroadcastMessage message) throws Exception {
+    protected void handleMessage(BroadcastMessage message) {
         if (message.getDevice() != null) {
             listeners.forEach(listener -> listener.updateDevice(false, message.getDevice()));
         } else if (message.getPosition() != null) {
@@ -105,22 +96,21 @@ public abstract class BaseBroadcastService implements BroadcastService {
             listeners.forEach(listener -> listener.updateEvent(false, message.getUserId(), message.getEvent()));
         } else if (message.getCommandDeviceId() != null) {
             listeners.forEach(listener -> listener.updateCommand(false, message.getCommandDeviceId()));
-        } else if (message.getInvalidateObject() != null) {
-            var invalidateObject = message.getInvalidateObject();
-            for (BroadcastInterface listener : listeners) {
-                listener.invalidateObject(
-                        false,
-                        Permission.getKeyClass(invalidateObject.getClazz()), invalidateObject.getId(),
-                        invalidateObject.getOperation());
-            }
-        } else if (message.getInvalidatePermission() != null) {
-            var invalidatePermission = message.getInvalidatePermission();
-            for (BroadcastInterface listener : listeners) {
-                listener.invalidatePermission(
-                        false,
-                        Permission.getKeyClass(invalidatePermission.getClazz1()), invalidatePermission.getId1(),
-                        Permission.getKeyClass(invalidatePermission.getClazz2()), invalidatePermission.getId2(),
-                        invalidatePermission.getLink());
+        } else if (message.getChanges() != null) {
+            var iterator = message.getChanges().entrySet().iterator();
+            if (iterator.hasNext()) {
+                var first = iterator.next();
+                if (iterator.hasNext()) {
+                    var second = iterator.next();
+                    listeners.forEach(listener -> listener.invalidatePermission(
+                            false,
+                            Permission.getKeyClass(first.getKey()), first.getValue(),
+                            Permission.getKeyClass(second.getKey()), second.getValue()));
+                } else {
+                    listeners.forEach(listener -> listener.invalidateObject(
+                            false,
+                            Permission.getKeyClass(first.getKey()), first.getValue()));
+                }
             }
         }
     }

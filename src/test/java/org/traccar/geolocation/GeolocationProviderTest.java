@@ -19,7 +19,7 @@ public class GeolocationProviderTest extends BaseTest {
     @Disabled
     @Test
     public void testMozilla() throws Exception {
-        GoogleGeolocationProvider provider = new GoogleGeolocationProvider(client, null);
+        MozillaGeolocationProvider provider = new MozillaGeolocationProvider(client, null);
 
         Network network = new Network(CellTower.from(208, 1, 2, 1234567));
 

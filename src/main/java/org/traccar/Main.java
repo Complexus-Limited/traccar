@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2012 - 2022 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,13 @@ package org.traccar;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.ProvisionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.traccar.broadcast.BroadcastService;
+import org.traccar.helper.model.DeviceUtil;
 import org.traccar.schedule.ScheduleManager;
 import org.traccar.storage.DatabaseModule;
+import org.traccar.storage.Storage;
 import org.traccar.web.WebModule;
 import org.traccar.web.WebServer;
 
@@ -32,9 +33,10 @@ import java.lang.management.MemoryMXBean;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class Main {
 
@@ -52,22 +54,24 @@ public final class Main {
     public static void logSystemInfo() {
         try {
             OperatingSystemMXBean operatingSystemBean = ManagementFactory.getOperatingSystemMXBean();
-            LOGGER.info(
-                    "Operating system name: {} version: {} architecture: {}",
-                    operatingSystemBean.getName(), operatingSystemBean.getVersion(), operatingSystemBean.getArch());
+            LOGGER.info("Operating system"
+                    + " name: " + operatingSystemBean.getName()
+                    + " version: " + operatingSystemBean.getVersion()
+                    + " architecture: " + operatingSystemBean.getArch());
 
             RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
-            LOGGER.info(
-                    "Java runtime name: {} vendor: {} version: {}",
-                    runtimeBean.getVmName(), runtimeBean.getVmVendor(), runtimeBean.getVmVersion());
+            LOGGER.info("Java runtime"
+                    + " name: " + runtimeBean.getVmName()
+                    + " vendor: " + runtimeBean.getVmVendor()
+                    + " version: " + runtimeBean.getVmVersion());
 
             MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
-            LOGGER.info(
-                    "Memory limit heap: {}mb non-heap: {}mb",
-                    memoryBean.getHeapMemoryUsage().getMax() / (1024 * 1024),
-                    memoryBean.getNonHeapMemoryUsage().getMax() / (1024 * 1024));
+            LOGGER.info("Memory limit"
+                    + " heap: " + memoryBean.getHeapMemoryUsage().getMax() / (1024 * 1024) + "mb"
+                    + " non-heap: " + memoryBean.getNonHeapMemoryUsage().getMax() / (1024 * 1024) + "mb");
 
-            LOGGER.info("Character encoding: {}", Charset.defaultCharset().displayName());
+            LOGGER.info("Character encoding: "
+                    + System.getProperty("file.encoding") + " charset: " + Charset.defaultCharset());
 
         } catch (Exception error) {
             LOGGER.warn("Failed to get system info");
@@ -115,17 +119,21 @@ public final class Main {
         try {
             injector = Guice.createInjector(new MainModule(configFile), new DatabaseModule(), new WebModule());
             logSystemInfo();
-            LOGGER.info("Version: {}", Main.class.getPackage().getImplementationVersion());
+            LOGGER.info("Version: " + Main.class.getPackage().getImplementationVersion());
             LOGGER.info("Starting server...");
 
-            var services = new ArrayList<LifecycleObject>();
-            for (var clazz : List.of(
-                    ScheduleManager.class, ServerManager.class, WebServer.class, BroadcastService.class)) {
-                var service = injector.getInstance(clazz);
-                if (service != null) {
-                    service.start();
-                    services.add(service);
-                }
+            if (injector.getInstance(BroadcastService.class).singleInstance()) {
+                DeviceUtil.resetStatus(injector.getInstance(Storage.class));
+            }
+
+            var services = Stream.of(
+                    ServerManager.class, WebServer.class, ScheduleManager.class, BroadcastService.class)
+                    .map(injector::getInstance)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+
+            for (var service : services) {
+                service.start();
             }
 
             Thread.setDefaultUncaughtExceptionHandler((t, e) -> LOGGER.error("Thread exception", e));
@@ -142,14 +150,8 @@ public final class Main {
                 }
             }));
         } catch (Exception e) {
-            Throwable unwrapped;
-            if (e instanceof ProvisionException) {
-                unwrapped = e.getCause();
-            } else {
-                unwrapped = e;
-            }
-            LOGGER.error("Main method error", unwrapped);
-            System.exit(1);
+            LOGGER.error("Main method error", e);
+            throw new RuntimeException(e);
         }
     }
 

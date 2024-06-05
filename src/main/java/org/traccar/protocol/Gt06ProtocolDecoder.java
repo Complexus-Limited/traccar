@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2012 - 2022 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -344,7 +344,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
 
         int mcc = buf.readUnsignedShort();
         int mnc;
-        if (BitUtil.check(mcc, 15) || type == MSG_GPS_LBS_6 || variant == Variant.SL4X) {
+        if (BitUtil.check(mcc, 15) || type == MSG_GPS_LBS_6) {
             mnc = buf.readUnsignedShort();
         } else {
             mnc = buf.readUnsignedByte();
@@ -410,8 +410,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
         }
     }
 
-    private String decodeAlarm(short value, String model) {
-        boolean modelLW = model != null && model.toUpperCase().startsWith("LW");
+    private String decodeAlarm(short value) {
         switch (value) {
             case 0x01:
                 return Position.ALARM_SOS;
@@ -428,6 +427,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                 return Position.ALARM_OVERSPEED;
             case 0x0E:
             case 0x0F:
+            case 0x19:
                 return Position.ALARM_LOW_BATTERY;
             case 0x11:
                 return Position.ALARM_POWER_OFF;
@@ -438,25 +438,18 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
             case 0x14:
                 return Position.ALARM_DOOR;
             case 0x18:
-                return modelLW ? Position.ALARM_ACCIDENT : Position.ALARM_REMOVING;
-            case 0x19:
-                return modelLW ? Position.ALARM_ACCELERATION : Position.ALARM_LOW_BATTERY;
-            case 0x1A:
-            case 0x28:
-                return Position.ALARM_BRAKING;
-            case 0x1B:
-            case 0x2A:
-            case 0x2B:
-            case 0x2E:
-                return Position.ALARM_CORNERING;
+                return Position.ALARM_REMOVING;
             case 0x23:
                 return Position.ALARM_FALL_DOWN;
             case 0x29:
                 return Position.ALARM_ACCELERATION;
+            case 0x30:
+                return Position.ALARM_BRAKING;
+            case 0x2A:
+            case 0x2B:
+                return Position.ALARM_CORNERING;
             case 0x2C:
                 return Position.ALARM_ACCIDENT;
-            case 0x30:
-                return Position.ALARM_JAMMING;
             default:
                 return null;
         }
@@ -835,8 +828,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                     int satellites = BitUtil.between(signal, 10, 15) + BitUtil.between(signal, 5, 10);
                     position.set(Position.KEY_SATELLITES, satellites);
                     position.set(Position.KEY_RSSI, BitUtil.to(signal, 5));
-                    position.set(Position.KEY_ALARM, decodeAlarm(
-                            buf.readUnsignedByte(), getDeviceModel(deviceSession)));
+                    position.set(Position.KEY_ALARM, decodeAlarm(buf.readUnsignedByte()));
                     buf.readUnsignedByte(); // language
                     position.set(Position.KEY_BATTERY_LEVEL, buf.readUnsignedByte());
                     buf.readUnsignedByte(); // working mode
@@ -847,7 +839,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                     position.set(Position.KEY_RSSI, buf.readUnsignedByte());
                     short alarmExtension = buf.readUnsignedByte();
                     if (variant != Variant.VXT01) {
-                        position.set(Position.KEY_ALARM, decodeAlarm(alarmExtension, getDeviceModel(deviceSession)));
+                        position.set(Position.KEY_ALARM, decodeAlarm(alarmExtension));
                     }
                 }
             }
@@ -886,8 +878,7 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
                     decodeStatus(position, buf);
                     position.set(Position.KEY_POWER, buf.readUnsignedShort() * 0.01);
                     position.set(Position.KEY_RSSI, buf.readUnsignedByte());
-                    position.set(Position.KEY_ALARM, decodeAlarm(
-                            buf.readUnsignedByte(), getDeviceModel(deviceSession)));
+                    position.set(Position.KEY_ALARM, decodeAlarm(buf.readUnsignedByte()));
                     position.set("oil", buf.readUnsignedShort());
                     int temperature = buf.readUnsignedByte();
                     if (BitUtil.check(temperature, 7)) {
@@ -1485,8 +1476,6 @@ public class Gt06ProtocolDecoder extends BaseProtocolDecoder {
         } else if (header == 0x7878 && type == MSG_ALARM && buf.getUnsignedShort(buf.readerIndex() + 4) == 0xffff) {
             variant = Variant.JC400;
         } else if (header == 0x7878 && type == MSG_LBS_3 && length == 0x37) {
-            variant = Variant.SL4X;
-        } else if (header == 0x7878 && type == MSG_GPS_LBS_STATUS_4 && length == 0x27) {
             variant = Variant.SL4X;
         } else if (header == 0x7878 && type == MSG_GPS_LBS_2 && length == 0x2f) {
             variant = Variant.SEEWORLD;

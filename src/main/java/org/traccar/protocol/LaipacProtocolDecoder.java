@@ -28,6 +28,7 @@ import org.traccar.helper.PatternBuilder;
 import org.traccar.model.CellTower;
 import org.traccar.model.Network;
 import org.traccar.model.Position;
+import org.traccar.model.Device;
 import org.traccar.helper.BitUtil;
 
 import java.net.SocketAddress;
@@ -225,7 +226,7 @@ public class LaipacProtocolDecoder extends BaseProtocolDecoder {
             return null;
         }
 
-        String model = getDeviceModel(deviceSession);
+        String model = getCacheManager().getObject(Device.class, deviceSession.getDeviceId()).getModel();
 
         Position position = new Position(getProtocolName());
 

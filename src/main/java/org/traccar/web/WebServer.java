@@ -21,6 +21,7 @@ import org.eclipse.jetty.http.HttpCookie;
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.proxy.AsyncProxyServlet;
+import org.eclipse.jetty.server.CustomRequestLog;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.RequestLogWriter;
 import org.eclipse.jetty.server.Server;
@@ -114,7 +115,8 @@ public class WebServer implements LifecycleObject {
             RequestLogWriter logWriter = new RequestLogWriter(config.getString(Keys.WEB_REQUEST_LOG_PATH));
             logWriter.setAppend(true);
             logWriter.setRetainDays(config.getInteger(Keys.WEB_REQUEST_LOG_RETAIN_DAYS));
-            server.setRequestLog(new WebRequestLog(logWriter));
+            CustomRequestLog requestLog = new CustomRequestLog(logWriter, CustomRequestLog.NCSA_FORMAT);
+            server.setRequestLog(requestLog);
         }
     }
 
@@ -139,7 +141,7 @@ public class WebServer implements LifecycleObject {
     }
 
     private void initWebApp(ServletContextHandler servletHandler) {
-        ServletHolder servletHolder = new ServletHolder(new DefaultOverrideServlet(config));
+        ServletHolder servletHolder = new ServletHolder(new ModernDefaultServlet(config));
         servletHolder.setInitParameter("resourceBase", new File(config.getString(Keys.WEB_PATH)).getAbsolutePath());
         servletHolder.setInitParameter("dirAllowed", "false");
         if (config.getBoolean(Keys.WEB_DEBUG)) {

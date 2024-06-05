@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2017 - 2022 Anton Tananaev (anton@traccar.org)
  * Copyright 2017 Andrey Kunitsyn (andrey@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,12 +16,19 @@
  */
 package org.traccar.handler.events;
 
-import jakarta.inject.Inject;
+import io.netty.channel.ChannelHandler;
 import org.traccar.helper.model.PositionUtil;
 import org.traccar.model.Event;
 import org.traccar.model.Position;
 import org.traccar.session.cache.CacheManager;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import java.util.Collections;
+import java.util.Map;
+
+@Singleton
+@ChannelHandler.Sharable
 public class DriverEventHandler extends BaseEventHandler {
 
     private final CacheManager cacheManager;
@@ -32,9 +39,9 @@ public class DriverEventHandler extends BaseEventHandler {
     }
 
     @Override
-    public void analyzePosition(Position position, Callback callback) {
+    protected Map<Event, Position> analyzePosition(Position position) {
         if (!PositionUtil.isLatest(cacheManager, position)) {
-            return;
+            return null;
         }
         String driverUniqueId = position.getString(Position.KEY_DRIVER_UNIQUE_ID);
         if (driverUniqueId != null) {
@@ -46,9 +53,10 @@ public class DriverEventHandler extends BaseEventHandler {
             if (!driverUniqueId.equals(oldDriverUniqueId)) {
                 Event event = new Event(Event.TYPE_DRIVER_CHANGED, position);
                 event.set(Position.KEY_DRIVER_UNIQUE_ID, driverUniqueId);
-                callback.eventDetected(event);
+                return Collections.singletonMap(event, position);
             }
         }
+        return null;
     }
 
 }

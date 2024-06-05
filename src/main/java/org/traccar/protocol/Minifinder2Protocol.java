@@ -31,8 +31,7 @@ public class Minifinder2Protocol extends BaseProtocol {
     @Inject
     public Minifinder2Protocol(Config config) {
         setSupportedDataCommands(
-                Command.TYPE_FIRMWARE_UPDATE,
-                Command.TYPE_CONFIGURATION);
+                Command.TYPE_FIRMWARE_UPDATE);
         addServer(new TrackerServer(config, getName(), false) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {

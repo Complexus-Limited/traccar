@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2020 - 2023 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,16 +18,15 @@ package org.traccar.notificators;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.traccar.model.ObjectOperation;
 import org.traccar.config.Config;
 import org.traccar.config.Keys;
 import org.traccar.model.Event;
 import org.traccar.model.Position;
 import org.traccar.model.User;
 import org.traccar.notification.NotificationFormatter;
-import org.traccar.notification.NotificationMessage;
 import org.traccar.session.cache.CacheManager;
 import org.traccar.storage.Storage;
+import org.traccar.storage.StorageException;
 import org.traccar.storage.query.Columns;
 import org.traccar.storage.query.Condition;
 import org.traccar.storage.query.Request;
@@ -44,10 +43,11 @@ import java.util.LinkedList;
 import java.util.List;
 
 @Singleton
-public class NotificatorTraccar extends Notificator {
+public class NotificatorTraccar implements Notificator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(NotificatorTraccar.class);
 
+    private final NotificationFormatter notificationFormatter;
     private final Client client;
     private final Storage storage;
     private final CacheManager cacheManager;
@@ -75,7 +75,7 @@ public class NotificatorTraccar extends Notificator {
     public NotificatorTraccar(
             Config config, NotificationFormatter notificationFormatter, Client client,
             Storage storage, CacheManager cacheManager) {
-        super(notificationFormatter, "short");
+        this.notificationFormatter = notificationFormatter;
         this.client = client;
         this.storage = storage;
         this.cacheManager = cacheManager;
@@ -84,8 +84,10 @@ public class NotificatorTraccar extends Notificator {
     }
 
     @Override
-    public void send(User user, NotificationMessage shortMessage, Event event, Position position) {
+    public void send(org.traccar.model.Notification notification, User user, Event event, Position position) {
         if (user.hasAttribute("notificationTokens")) {
+
+            var shortMessage = notificationFormatter.formatMessage(user, event, position, "short");
 
             NotificationObject item = new NotificationObject();
             item.title = shortMessage.getSubject();
@@ -126,9 +128,9 @@ public class NotificatorTraccar extends Notificator {
                     storage.updateObject(user, new Request(
                             new Columns.Include("attributes"),
                             new Condition.Equals("id", user.getId())));
-                    cacheManager.invalidateObject(true, User.class, user.getId(), ObjectOperation.UPDATE);
+                    cacheManager.updateOrInvalidate(true, user);
                 }
-            } catch (Exception e) {
+            } catch (StorageException e) {
                 LOGGER.warn("Push error", e);
             }
         }

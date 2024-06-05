@@ -49,7 +49,7 @@ public class DeviceLookupService {
 
     private final boolean throttlingEnabled;
 
-    private static final class IdentifierInfo {
+    private static class IdentifierInfo {
         private long lastQuery;
         private long delay;
         private Timeout timeout;

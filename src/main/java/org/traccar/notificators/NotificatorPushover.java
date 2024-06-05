@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2020 - 2023 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,21 +17,24 @@ package org.traccar.notificators;
 
 import org.traccar.helper.WebHelper;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import org.traccar.config.Config;
+import org.traccar.config.Keys;
+import org.traccar.model.Event;
+import org.traccar.model.Notification;
+import org.traccar.model.Position;
+import org.traccar.model.User;
+import org.traccar.notification.NotificationFormatter;
+
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
-import org.traccar.config.Config;
-import org.traccar.config.Keys;
-import org.traccar.model.Event;
-import org.traccar.model.Position;
-import org.traccar.model.User;
-import org.traccar.notification.NotificationFormatter;
-import org.traccar.notification.NotificationMessage;
 
 @Singleton
-public class NotificatorPushover extends Notificator {
+public class NotificatorPushover implements Notificator {
 
+    private final NotificationFormatter notificationFormatter;
     private final Client client;
     
     private final String pushoverurl;
@@ -66,7 +69,7 @@ public class NotificatorPushover extends Notificator {
 
     @Inject
     public NotificatorPushover(Config config, NotificationFormatter notificationFormatter, Client client) {
-        super(notificationFormatter, "short");
+        this.notificationFormatter = notificationFormatter;
         this.client = client;
         pushoverurl = "https://api.pushover.net/1/messages.json";
         token = config.getString(Keys.NOTIFICATOR_PUSHOVER_TOKEN);
@@ -76,7 +79,8 @@ public class NotificatorPushover extends Notificator {
 
 
     @Override
-    public void send(User user, NotificationMessage shortMessage, Event event, Position position) {
+    public void send(Notification notification, User user, Event event, Position position) {
+        var shortMessage = notificationFormatter.formatMessage(user, event, position, "short");
 
         Message message = new Message();
         message.token = token;

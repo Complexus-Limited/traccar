@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2015 - 2023 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,9 @@
  */
 package org.traccar.handler;
 
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.traccar.config.Config;
@@ -24,7 +27,8 @@ import org.traccar.geolocation.GeolocationProvider;
 import org.traccar.model.Position;
 import org.traccar.session.cache.CacheManager;
 
-public class GeolocationHandler extends BasePositionHandler {
+@ChannelHandler.Sharable
+public class GeolocationHandler extends ChannelInboundHandlerAdapter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GeolocationHandler.class);
 
@@ -47,41 +51,46 @@ public class GeolocationHandler extends BasePositionHandler {
     }
 
     @Override
-    public void handlePosition(Position position, Callback callback) {
-        if ((position.getOutdated() || processInvalidPositions && !position.getValid())
-                && position.getNetwork() != null
-                && (!requireWifi || position.getNetwork().getWifiAccessPoints() != null)) {
-            if (reuse) {
-                Position lastPosition = cacheManager.getPosition(position.getDeviceId());
-                if (lastPosition != null && position.getNetwork().equals(lastPosition.getNetwork())) {
-                    updatePosition(
-                            position, lastPosition.getLatitude(), lastPosition.getLongitude(),
-                            lastPosition.getAccuracy());
-                    callback.processed(false);
-                    return;
+    public void channelRead(final ChannelHandlerContext ctx, Object message) {
+        if (message instanceof Position) {
+            final Position position = (Position) message;
+            if ((position.getOutdated() || processInvalidPositions && !position.getValid())
+                    && position.getNetwork() != null
+                    && (!requireWifi || position.getNetwork().getWifiAccessPoints() != null)) {
+                if (reuse) {
+                    Position lastPosition = cacheManager.getPosition(position.getDeviceId());
+                    if (lastPosition != null && position.getNetwork().equals(lastPosition.getNetwork())) {
+                        updatePosition(
+                                position, lastPosition.getLatitude(), lastPosition.getLongitude(),
+                                lastPosition.getAccuracy());
+                        ctx.fireChannelRead(position);
+                        return;
+                    }
                 }
+
+                if (statisticsManager != null) {
+                    statisticsManager.registerGeolocationRequest();
+                }
+
+                geolocationProvider.getLocation(position.getNetwork(),
+                        new GeolocationProvider.LocationProviderCallback() {
+                    @Override
+                    public void onSuccess(double latitude, double longitude, double accuracy) {
+                        updatePosition(position, latitude, longitude, accuracy);
+                        ctx.fireChannelRead(position);
+                    }
+
+                    @Override
+                    public void onFailure(Throwable e) {
+                        LOGGER.warn("Geolocation network error", e);
+                        ctx.fireChannelRead(position);
+                    }
+                });
+            } else {
+                ctx.fireChannelRead(position);
             }
-
-            if (statisticsManager != null) {
-                statisticsManager.registerGeolocationRequest();
-            }
-
-            geolocationProvider.getLocation(position.getNetwork(),
-                    new GeolocationProvider.LocationProviderCallback() {
-                @Override
-                public void onSuccess(double latitude, double longitude, double accuracy) {
-                    updatePosition(position, latitude, longitude, accuracy);
-                    callback.processed(false);
-                }
-
-                @Override
-                public void onFailure(Throwable e) {
-                    LOGGER.warn("Geolocation network error", e);
-                    callback.processed(false);
-                }
-            });
         } else {
-            callback.processed(false);
+            ctx.fireChannelRead(message);
         }
     }
 

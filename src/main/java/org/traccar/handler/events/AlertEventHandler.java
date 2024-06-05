@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2016 - 2022 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,21 @@
  */
 package org.traccar.handler.events;
 
-import jakarta.inject.Inject;
+import java.util.Collections;
+import java.util.Map;
+
+import io.netty.channel.ChannelHandler;
 import org.traccar.config.Config;
 import org.traccar.config.Keys;
 import org.traccar.model.Event;
 import org.traccar.model.Position;
 import org.traccar.session.cache.CacheManager;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
+@Singleton
+@ChannelHandler.Sharable
 public class AlertEventHandler extends BaseEventHandler {
 
     private final CacheManager cacheManager;
@@ -34,7 +42,7 @@ public class AlertEventHandler extends BaseEventHandler {
     }
 
     @Override
-    public void analyzePosition(Position position, Callback callback) {
+    protected Map<Event, Position> analyzePosition(Position position) {
         Object alarm = position.getAttributes().get(Position.KEY_ALARM);
         if (alarm != null) {
             boolean ignoreAlert = false;
@@ -47,9 +55,10 @@ public class AlertEventHandler extends BaseEventHandler {
             if (!ignoreAlert) {
                 Event event = new Event(Event.TYPE_ALARM, position);
                 event.set(Position.KEY_ALARM, (String) alarm);
-                callback.eventDetected(event);
+                return Collections.singletonMap(event, position);
             }
         }
+        return null;
     }
 
 }

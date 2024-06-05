@@ -14,7 +14,8 @@ public class Minifinder2ProtocolEncoderTest extends ProtocolTest {
 
         var encoder = inject(new Minifinder2ProtocolEncoder(null));
 
-        encoder.setModelOverride("Nano");
+        var device = encoder.getCacheManager().getObject(Device.class, 1);
+        when(device.getModel()).thenReturn("Nano");
 
         Command command = new Command();
         command.setDeviceId(1);

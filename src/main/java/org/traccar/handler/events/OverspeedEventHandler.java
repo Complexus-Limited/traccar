@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2016 - 2023 Anton Tananaev (anton@traccar.org)
  * Copyright 2018 Andrey Kunitsyn (andrey@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +16,7 @@
  */
 package org.traccar.handler.events;
 
-import jakarta.inject.Inject;
+import io.netty.channel.ChannelHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.traccar.config.Config;
@@ -24,6 +24,7 @@ import org.traccar.config.Keys;
 import org.traccar.helper.model.AttributeUtil;
 import org.traccar.helper.model.PositionUtil;
 import org.traccar.model.Device;
+import org.traccar.model.Event;
 import org.traccar.model.Geofence;
 import org.traccar.model.Position;
 import org.traccar.session.cache.CacheManager;
@@ -35,6 +36,13 @@ import org.traccar.storage.query.Columns;
 import org.traccar.storage.query.Condition;
 import org.traccar.storage.query.Request;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import java.util.Collections;
+import java.util.Map;
+
+@Singleton
+@ChannelHandler.Sharable
 public class OverspeedEventHandler extends BaseEventHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OverspeedEventHandler.class);
@@ -47,7 +55,8 @@ public class OverspeedEventHandler extends BaseEventHandler {
     private final double multiplier;
 
     @Inject
-    public OverspeedEventHandler(Config config, CacheManager cacheManager, Storage storage) {
+    public OverspeedEventHandler(
+            Config config, CacheManager cacheManager, Storage storage) {
         this.cacheManager = cacheManager;
         this.storage = storage;
         minimalDuration = config.getLong(Keys.EVENT_OVERSPEED_MINIMAL_DURATION) * 1000;
@@ -56,15 +65,15 @@ public class OverspeedEventHandler extends BaseEventHandler {
     }
 
     @Override
-    public void analyzePosition(Position position, Callback callback) {
+    protected Map<Event, Position> analyzePosition(Position position) {
 
         long deviceId = position.getDeviceId();
         Device device = cacheManager.getObject(Device.class, position.getDeviceId());
         if (device == null) {
-            return;
+            return null;
         }
         if (!PositionUtil.isLatest(cacheManager, position) || !position.getValid()) {
-            return;
+            return null;
         }
 
         double speedLimit = AttributeUtil.lookup(cacheManager, Keys.EVENT_OVERSPEED_LIMIT, deviceId);
@@ -96,7 +105,7 @@ public class OverspeedEventHandler extends BaseEventHandler {
         }
 
         if (speedLimit == 0) {
-            return;
+            return null;
         }
 
         OverspeedState state = OverspeedState.fromDevice(device);
@@ -111,9 +120,7 @@ public class OverspeedEventHandler extends BaseEventHandler {
                 LOGGER.warn("Update device overspeed error", e);
             }
         }
-        if (state.getEvent() != null) {
-            callback.eventDetected(state.getEvent());
-        }
+        return state.getEvent() != null ? Collections.singletonMap(state.getEvent(), position) : null;
     }
 
 }

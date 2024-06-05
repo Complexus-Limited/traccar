@@ -131,10 +131,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         if (BitUtil.check(value, 8)) {
             return Position.ALARM_POWER_OFF;
         }
-        if (BitUtil.check(value, 15)) {
-            return Position.ALARM_VIBRATION;
-        }
-        if (BitUtil.check(value, 16) || BitUtil.check(value, 17)) {
+        if (BitUtil.check(value, 17)) {
             return Position.ALARM_TAMPERING;
         }
         if (BitUtil.check(value, 20)) {
@@ -143,7 +140,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         if (BitUtil.check(value, 28)) {
             return Position.ALARM_MOVEMENT;
         }
-        if (BitUtil.check(value, 29) || BitUtil.check(value, 30)) {
+        if (BitUtil.check(value, 29)) {
             return Position.ALARM_ACCIDENT;
         }
         return null;
@@ -403,7 +400,6 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         int status = buf.readInt();
 
         position.set(Position.KEY_IGNITION, BitUtil.check(status, 0));
-        position.set(Position.KEY_MOTION, BitUtil.check(status, 4));
         position.set(Position.KEY_BLOCKED, BitUtil.check(status, 10));
         position.set(Position.KEY_CHARGE, BitUtil.check(status, 26));
 
@@ -472,12 +468,8 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 case 0x02:
                     position.set(Position.KEY_FUEL_LEVEL, buf.readUnsignedShort() * 0.1);
                     break;
-                case 0x25:
-                    position.set(Position.KEY_INPUT, buf.readUnsignedInt());
-                    break;
                 case 0x2b:
-                    position.set(Position.PREFIX_ADC + 1, buf.readUnsignedShort());
-                    position.set(Position.PREFIX_ADC + 2, buf.readUnsignedShort());
+                    position.set(Position.KEY_FUEL_CONSUMPTION, buf.readUnsignedInt());
                     break;
                 case 0x30:
                     position.set(Position.KEY_RSSI, buf.readUnsignedByte());
@@ -492,24 +484,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                         position.set(Position.KEY_BATTERY, Integer.parseInt(lockStatus.substring(2, 5)) * 0.01);
                     }
                     break;
-                case 0x51:
-                    if (length == 16) {
-                        for (int i = 1; i <= 8; i++) {
-                            position.set(Position.PREFIX_TEMP + i, buf.readShort());
-                        }
-                    }
-                    break;
                 case 0x56:
                     position.set(Position.KEY_BATTERY_LEVEL, buf.readUnsignedByte() * 10);
                     buf.readUnsignedByte(); // reserved
-                    break;
-                case 0x57:
-                    int alarm = buf.readUnsignedShort();
-                    position.set(Position.KEY_ALARM, BitUtil.check(alarm, 8) ? Position.ALARM_ACCELERATION : null);
-                    position.set(Position.KEY_ALARM, BitUtil.check(alarm, 9) ? Position.ALARM_BRAKING : null);
-                    position.set(Position.KEY_ALARM, BitUtil.check(alarm, 10) ? Position.ALARM_CORNERING : null);
-                    buf.readUnsignedShort(); // external switch state
-                    buf.skipBytes(4); // reserved
                     break;
                 case 0x60:
                     int event = buf.readUnsignedShort();
@@ -527,36 +504,6 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                         position.set("lock" + i + "Seal", buf.readUnsignedByte() == 0x31);
                         buf.readUnsignedByte(); // physical state
                         buf.readUnsignedByte(); // rssi
-                    }
-                    break;
-                case 0x64:
-                    buf.readUnsignedInt(); // alarm serial number
-                    buf.readUnsignedByte(); // alarm status
-                    position.set("adasAlarm", buf.readUnsignedByte());
-                    break;
-                case 0x65:
-                    buf.readUnsignedInt(); // alarm serial number
-                    buf.readUnsignedByte(); // alarm status
-                    position.set("dmsAlarm", buf.readUnsignedByte());
-                    break;
-                case 0x70:
-                    buf.readUnsignedInt(); // alarm serial number
-                    buf.readUnsignedByte(); // alarm status
-                    switch (buf.readUnsignedByte()) {
-                        case 0x01:
-                            position.set(Position.KEY_ALARM, Position.ALARM_ACCELERATION);
-                            break;
-                        case 0x02:
-                            position.set(Position.KEY_ALARM, Position.ALARM_BRAKING);
-                            break;
-                        case 0x03:
-                            position.set(Position.KEY_ALARM, Position.ALARM_CORNERING);
-                            break;
-                        case 0x16:
-                            position.set(Position.KEY_ALARM, Position.ALARM_ACCIDENT);
-                            break;
-                        default:
-                            break;
                     }
                     break;
                 case 0x69:
@@ -613,11 +560,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     break;
                 case 0xD4:
                 case 0xE1:
-                    if (length == 1) {
-                        position.set(Position.KEY_BATTERY_LEVEL, buf.readUnsignedByte());
-                    } else {
-                        position.set(Position.KEY_DRIVER_UNIQUE_ID, String.valueOf(buf.readUnsignedInt()));
-                    }
+                    position.set(Position.KEY_BATTERY_LEVEL, buf.readUnsignedByte());
                     break;
                 case 0xD5:
                     if (length == 2) {
@@ -639,9 +582,6 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     position.set("string", BitUtil.check(deviceStatus, 0));
                     position.set(Position.KEY_MOTION, BitUtil.check(deviceStatus, 2));
                     position.set("cover", BitUtil.check(deviceStatus, 3));
-                    break;
-                case 0xE2:
-                    position.set(Position.KEY_FUEL_LEVEL, buf.readUnsignedInt() * 0.1);
                     break;
                 case 0xE6:
                     while (buf.readerIndex() < endIndex) {
@@ -675,10 +615,6 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                     position.set("fuel2", Double.parseDouble(
                                             buf.readCharSequence(6, StandardCharsets.US_ASCII).toString()));
                                     break;
-                                case 0x00B2:
-                                    position.set(Position.KEY_ICCID, ByteBufUtil.hexDump(
-                                            buf.readSlice(10)).replaceAll("f", ""));
-                                    break;
                                 case 0x00CE:
                                     position.set(Position.KEY_POWER, buf.readUnsignedShort() * 0.01);
                                     break;
@@ -689,8 +625,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                             buf.readUnsignedShort(), buf.readUnsignedInt()));
                                     position.setNetwork(network);
                                     break;
-                                case 0x00A8:
-                                case 0x00E1:
+                                case 0xE1:
                                     position.set(Position.KEY_BATTERY_LEVEL, buf.readUnsignedByte());
                                     break;
                                 default:
@@ -961,7 +896,6 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         int type = buf.readUnsignedByte();
 
         if (type == 0xF0) {
-
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
 
@@ -989,12 +923,6 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                 break;
                             case 0x0103:
                                 position.set(Position.KEY_FUEL_LEVEL, buf.readUnsignedInt() * 0.01);
-                                break;
-                            case 0x0111:
-                                position.set("fuelTemp", buf.readUnsignedByte() - 40);
-                                break;
-                            case 0x012E:
-                                position.set("oilLevel", buf.readUnsignedShort() * 0.1);
                                 break;
                             case 0x052A:
                                 position.set(Position.KEY_FUEL_LEVEL, buf.readUnsignedShort() * 0.01);
@@ -1130,53 +1058,11 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     }
                     getLastLocation(position, time);
                     break;
-                case 0x15:
-                    int event = buf.readInt();
-                    switch (event) {
-                        case 51:
-                            position.set(Position.KEY_ALARM, Position.ALARM_ACCELERATION);
-                            break;
-                        case 52:
-                            position.set(Position.KEY_ALARM, Position.ALARM_BRAKING);
-                            break;
-                        case 53:
-                            position.set(Position.KEY_ALARM, Position.ALARM_CORNERING);
-                            break;
-                        case 54:
-                            position.set(Position.KEY_ALARM, Position.ALARM_LANE_CHANGE);
-                            break;
-                        case 56:
-                            position.set(Position.KEY_ALARM, Position.ALARM_ACCIDENT);
-                            break;
-                        default:
-                            position.set(Position.KEY_EVENT, event);
-                            break;
-                    }
-                    getLastLocation(position, time);
-                    break;
                 default:
                     return null;
             }
 
             return position;
-
-        } else if (type == 0xFF) {
-
-            Position position = new Position(getProtocolName());
-            position.setDeviceId(deviceSession.getDeviceId());
-
-            position.setValid(true);
-            position.setTime(readDate(buf, deviceSession.get(DeviceSession.KEY_TIMEZONE)));
-            position.setLatitude(buf.readInt() * 0.000001);
-            position.setLongitude(buf.readInt() * 0.000001);
-            position.setAltitude(buf.readShort());
-            position.setSpeed(UnitsConverter.knotsFromKph(buf.readUnsignedShort() * 0.1));
-            position.setCourse(buf.readUnsignedShort());
-
-            // TODO more positions and g sensor data
-
-            return position;
-
         }
 
         return null;

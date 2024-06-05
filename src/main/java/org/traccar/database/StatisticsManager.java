@@ -121,7 +121,7 @@ public class StatisticsManager {
             }
 
             String url = config.getString(Keys.SERVER_STATISTICS);
-            if (url != null && !url.isEmpty()) {
+            if (url != null) {
                 String time = DateUtil.formatDate(statistics.getCaptureTime());
 
                 Form form = new Form();

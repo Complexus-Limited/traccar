@@ -39,8 +39,6 @@ public abstract class BaseProtocolEncoder extends ChannelOutboundHandlerAdapter 
 
     private CacheManager cacheManager;
 
-    private String modelOverride;
-
     public BaseProtocolEncoder(Protocol protocol) {
         this.protocol = protocol;
     }
@@ -68,15 +66,6 @@ public abstract class BaseProtocolEncoder extends ChannelOutboundHandlerAdapter 
                     cacheManager, command.getDeviceId(), getProtocolName(), defaultPassword);
             command.set(Command.KEY_DEVICE_PASSWORD, password);
         }
-    }
-
-    public void setModelOverride(String modelOverride) {
-        this.modelOverride = modelOverride;
-    }
-
-    public String getDeviceModel(long deviceId) {
-        String model = getCacheManager().getObject(Device.class, deviceId).getModel();
-        return modelOverride != null ? modelOverride : model;
     }
 
     @Override

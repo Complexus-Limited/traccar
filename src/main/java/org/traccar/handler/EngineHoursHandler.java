@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2018 - 2022 Anton Tananaev (anton@traccar.org)
  * Copyright 2018 Andrey Kunitsyn (andrey@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,11 +16,17 @@
  */
 package org.traccar.handler;
 
-import jakarta.inject.Inject;
+import io.netty.channel.ChannelHandler;
+import org.traccar.BaseDataHandler;
 import org.traccar.model.Position;
 import org.traccar.session.cache.CacheManager;
 
-public class EngineHoursHandler extends BasePositionHandler {
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
+@Singleton
+@ChannelHandler.Sharable
+public class EngineHoursHandler extends BaseDataHandler {
 
     private final CacheManager cacheManager;
 
@@ -30,7 +36,7 @@ public class EngineHoursHandler extends BasePositionHandler {
     }
 
     @Override
-    public void handlePosition(Position position, Callback callback) {
+    protected Position handlePosition(Position position) {
         if (!position.hasAttribute(Position.KEY_HOURS)) {
             Position last = cacheManager.getPosition(position.getDeviceId());
             if (last != null) {
@@ -43,7 +49,7 @@ public class EngineHoursHandler extends BasePositionHandler {
                 }
             }
         }
-        callback.processed(false);
+        return position;
     }
 
 }

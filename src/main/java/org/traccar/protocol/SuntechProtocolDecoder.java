@@ -295,60 +295,6 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
         return position;
     }
 
-    private int decodeSerialData(Position position, String[] values, int index) {
-
-        int remaining = Integer.parseInt(values[index++]);
-        double totalFuel = 0;
-        while (remaining > 0) {
-            String attribute = values[index++];
-            if (attribute.startsWith("CabAVL")) {
-                String[] data = attribute.split(",");
-                double fuel1 = Double.parseDouble(data[2]);
-                if (fuel1 > 0) {
-                    totalFuel += fuel1;
-                    position.set("fuel1", fuel1);
-                }
-                double fuel2 = Double.parseDouble(data[3]);
-                if (fuel2 > 0) {
-                    totalFuel += fuel2;
-                    position.set("fuel2", fuel2);
-                }
-            } else if (attribute.startsWith("GTSL")) {
-                position.set(Position.KEY_DRIVER_UNIQUE_ID, attribute.split("\\|")[4]);
-            } else if (attribute.contains("=")) {
-                String[] pair = attribute.split("=");
-                if (pair.length >= 2) {
-                    String value = pair[1].trim();
-                    if (value.contains(".")) {
-                        value = value.substring(0, value.indexOf('.'));
-                    }
-                    switch (pair[0].charAt(0)) {
-                        case 't':
-                            position.set(Position.PREFIX_TEMP + pair[0].charAt(2), Integer.parseInt(value, 16));
-                            break;
-                        case 'N':
-                            int fuel = Integer.parseInt(value, 16);
-                            totalFuel += fuel;
-                            position.set("fuel" + pair[0].charAt(2), fuel);
-                            break;
-                        case 'Q':
-                            position.set("drivingQuality", Integer.parseInt(value, 16));
-                            break;
-                        default:
-                            break;
-                    }
-                }
-            } else {
-                position.set("serial", attribute.trim());
-            }
-            remaining -= attribute.length() + 1;
-        }
-        if (totalFuel > 0) {
-            position.set(Position.KEY_FUEL_LEVEL, totalFuel);
-        }
-        return index + 1; // checksum
-    }
-
     private Position decode2356(
             Channel channel, SocketAddress remoteAddress, String protocol, String[] values) throws ParseException {
         int index = 0;
@@ -425,7 +371,56 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
                 position.set(Position.KEY_ALARM, decodeAlert(Integer.parseInt(values[index++])));
                 break;
             case "UEX":
-                index = decodeSerialData(position, values, index);
+                int remaining = Integer.parseInt(values[index++]);
+                double totalFuel = 0;
+                while (remaining > 0) {
+                    String attribute = values[index++];
+                    if (attribute.startsWith("CabAVL")) {
+                        String[] data = attribute.split(",");
+                        double fuel1 = Double.parseDouble(data[2]);
+                        if (fuel1 > 0) {
+                            totalFuel += fuel1;
+                            position.set("fuel1", fuel1);
+                        }
+                        double fuel2 = Double.parseDouble(data[3]);
+                        if (fuel2 > 0) {
+                            totalFuel += fuel2;
+                            position.set("fuel2", fuel2);
+                        }
+                    } else if (attribute.startsWith("GTSL")) {
+                        position.set(Position.KEY_DRIVER_UNIQUE_ID, attribute.split("\\|")[4]);
+                    } else if (attribute.contains("=")) {
+                        String[] pair = attribute.split("=");
+                        if (pair.length >= 2) {
+                            String value = pair[1].trim();
+                            if (value.contains(".")) {
+                                value = value.substring(0, value.indexOf('.'));
+                            }
+                            switch (pair[0].charAt(0)) {
+                                case 't':
+                                    position.set(Position.PREFIX_TEMP + pair[0].charAt(2), Integer.parseInt(value, 16));
+                                    break;
+                                case 'N':
+                                    int fuel = Integer.parseInt(value, 16);
+                                    totalFuel += fuel;
+                                    position.set("fuel" + pair[0].charAt(2), fuel);
+                                    break;
+                                case 'Q':
+                                    position.set("drivingQuality", Integer.parseInt(value, 16));
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    } else {
+                        position.set("serial", attribute.trim());
+                    }
+                    remaining -= attribute.length() + 1;
+                }
+                if (totalFuel > 0) {
+                    position.set(Position.KEY_FUEL_LEVEL, totalFuel);
+                }
+                index += 1; // checksum
                 break;
             default:
                 break;
@@ -459,10 +454,9 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
 
             if (values.length - index >= 2) {
                 String driverUniqueId = values[index++];
-                if (!driverUniqueId.isEmpty()) {
+                if (values[index++].equals("1") && !driverUniqueId.isEmpty()) {
                     position.set(Position.KEY_DRIVER_UNIQUE_ID, driverUniqueId);
                 }
-                index += 1; // registered
             }
 
             if (isIncludeTemp(deviceSession.getDeviceId())) {
@@ -487,8 +481,7 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
 
         String type = values[index++];
 
-        if (!type.equals("STT") && !type.equals("ALT") && !type.equals("BLE") && !type.equals("RES")
-                && !type.equals("UEX")) {
+        if (!type.equals("STT") && !type.equals("ALT") && !type.equals("BLE") && !type.equals("RES")) {
             return null;
         }
 
@@ -607,40 +600,34 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
                 position.set(Position.KEY_OUTPUT, Integer.parseInt(values[index++]));
             }
 
-            switch (type) {
-                case "ALT":
-                    if (BitUtil.check(mask, 19)) {
-                        int alertId = Integer.parseInt(values[index++]);
-                        position.set(Position.KEY_ALARM, decodeAlert(alertId));
-                    }
-                    if (BitUtil.check(mask, 20)) {
-                        position.set("alertModifier", values[index++]);
-                    }
-                    if (BitUtil.check(mask, 21)) {
-                        position.set("alertData", values[index++]);
-                    }
-                    break;
-                case "UEX":
-                    index = decodeSerialData(position, values, index);
-                    break;
-                default:
-                    if (BitUtil.check(mask, 19)) {
-                        position.set("mode", Integer.parseInt(values[index++]));
-                    }
-                    if (BitUtil.check(mask, 20)) {
-                        position.set("reason", Integer.parseInt(values[index++]));
-                    }
-                    if (BitUtil.check(mask, 21)) {
-                        position.set(Position.KEY_INDEX, Integer.parseInt(values[index++]));
-                    }
-                    break;
+            if (type.equals("ALT")) {
+                if (BitUtil.check(mask, 19)) {
+                    int alertId = Integer.parseInt(values[index++]);
+                    position.set(Position.KEY_ALARM, decodeAlert(alertId));
+                }
+                if (BitUtil.check(mask, 20)) {
+                    position.set("alertModifier", values[index++]);
+                }
+                if (BitUtil.check(mask, 21)) {
+                    position.set("alertData", values[index++]);
+                }
+            } else {
+                if (BitUtil.check(mask, 19)) {
+                    position.set("mode", Integer.parseInt(values[index++]));
+                }
+                if (BitUtil.check(mask, 20)) {
+                    position.set("reason", Integer.parseInt(values[index++]));
+                }
+                if (BitUtil.check(mask, 21)) {
+                    position.set(Position.KEY_INDEX, Integer.parseInt(values[index++]));
+                }
             }
 
             if (BitUtil.check(mask, 22)) {
                 index += 1; // reserved
             }
 
-            if (BitUtil.check(mask, 23) && !type.equals("UEX")) {
+            if (BitUtil.check(mask, 23)) {
                 int assignMask = Integer.parseInt(values[index++], 16);
                 for (int i = 0; i <= 30; i++) {
                     if (BitUtil.check(assignMask, i)) {

@@ -17,7 +17,6 @@
 package org.traccar.api;
 
 import org.traccar.api.security.ServiceAccountUser;
-import org.traccar.model.ObjectOperation;
 import org.traccar.helper.LogAction;
 import org.traccar.model.BaseModel;
 import org.traccar.model.Group;
@@ -67,7 +66,7 @@ public abstract class BaseObjectResource<T extends BaseModel> extends BaseResour
     }
 
     @POST
-    public Response add(T entity) throws Exception {
+    public Response add(T entity) throws StorageException {
         permissionsService.checkEdit(getUserId(), entity, true);
 
         entity.setId(storage.addObject(entity, new Request(new Columns.Exclude("id"))));
@@ -75,8 +74,8 @@ public abstract class BaseObjectResource<T extends BaseModel> extends BaseResour
 
         if (getUserId() != ServiceAccountUser.ID) {
             storage.addPermission(new Permission(User.class, getUserId(), baseClass, entity.getId()));
-            cacheManager.invalidatePermission(true, User.class, getUserId(), baseClass, entity.getId(), true);
-            connectionManager.invalidatePermission(true, User.class, getUserId(), baseClass, entity.getId(), true);
+            cacheManager.invalidatePermission(true, User.class, getUserId(), baseClass, entity.getId());
+            connectionManager.invalidatePermission(true, User.class, getUserId(), baseClass, entity.getId());
             LogAction.link(getUserId(), User.class, getUserId(), baseClass, entity.getId());
         }
 
@@ -85,7 +84,7 @@ public abstract class BaseObjectResource<T extends BaseModel> extends BaseResour
 
     @Path("{id}")
     @PUT
-    public Response update(T entity) throws Exception {
+    public Response update(T entity) throws StorageException {
         permissionsService.checkEdit(getUserId(), entity, false);
         permissionsService.checkPermission(baseClass, getUserId(), entity.getId());
 
@@ -111,7 +110,7 @@ public abstract class BaseObjectResource<T extends BaseModel> extends BaseResour
                         new Condition.Equals("id", entity.getId())));
             }
         }
-        cacheManager.invalidateObject(true, entity.getClass(), entity.getId(), ObjectOperation.UPDATE);
+        cacheManager.updateOrInvalidate(true, entity);
         LogAction.edit(getUserId(), entity);
 
         return Response.ok(entity).build();
@@ -119,12 +118,12 @@ public abstract class BaseObjectResource<T extends BaseModel> extends BaseResour
 
     @Path("{id}")
     @DELETE
-    public Response remove(@PathParam("id") long id) throws Exception {
+    public Response remove(@PathParam("id") long id) throws StorageException {
         permissionsService.checkEdit(getUserId(), baseClass, false);
         permissionsService.checkPermission(baseClass, getUserId(), id);
 
         storage.removeObject(baseClass, new Request(new Condition.Equals("id", id)));
-        cacheManager.invalidateObject(true, baseClass, id, ObjectOperation.DELETE);
+        cacheManager.invalidate(baseClass, id);
 
         LogAction.remove(getUserId(), baseClass, id);
 

@@ -54,7 +54,7 @@ public class ServerManager implements LifecycleObject {
         for (Class<?> protocolClass : ClassScanner.findSubclasses(BaseProtocol.class, "org.traccar.protocol")) {
             String protocolName = BaseProtocol.nameFromClass(protocolClass);
             if (enabledProtocols == null || enabledProtocols.contains(protocolName)) {
-                if (config.getInteger(Keys.PROTOCOL_PORT.withPrefix(protocolName)) > 0) {
+                if (config.hasKey(Keys.PROTOCOL_PORT.withPrefix(protocolName))) {
                     BaseProtocol protocol = (BaseProtocol) injector.getInstance(protocolClass);
                     connectorList.addAll(protocol.getConnectorList());
                     protocolList.put(protocol.getName(), protocol);
@@ -82,8 +82,12 @@ public class ServerManager implements LifecycleObject {
 
     @Override
     public void stop() throws Exception {
-        for (TrackerConnector connector : connectorList) {
-            connector.stop();
+        try {
+            for (TrackerConnector connector : connectorList) {
+                connector.stop();
+            }
+        } finally {
+            GlobalTimer.release();
         }
     }
 

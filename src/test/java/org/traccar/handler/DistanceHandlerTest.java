@@ -15,15 +15,14 @@ public class DistanceHandlerTest {
 
         DistanceHandler distanceHandler = new DistanceHandler(new Config(), mock(CacheManager.class));
 
-        Position position = new Position();
-        distanceHandler.handlePosition(position, p -> {});
+        Position position = distanceHandler.handlePosition(new Position());
 
         assertEquals(0.0, position.getAttributes().get(Position.KEY_DISTANCE));
         assertEquals(0.0, position.getAttributes().get(Position.KEY_TOTAL_DISTANCE));
 
         position.set(Position.KEY_DISTANCE, 100);
 
-        distanceHandler.handlePosition(position, p -> {});
+        position = distanceHandler.handlePosition(position);
 
         assertEquals(100.0, position.getAttributes().get(Position.KEY_DISTANCE));
         assertEquals(100.0, position.getAttributes().get(Position.KEY_TOTAL_DISTANCE));

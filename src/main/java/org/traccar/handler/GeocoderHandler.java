@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2012 - 2021 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,9 @@
  */
 package org.traccar.handler;
 
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.traccar.config.Config;
@@ -23,7 +26,8 @@ import org.traccar.geocoder.Geocoder;
 import org.traccar.model.Position;
 import org.traccar.session.cache.CacheManager;
 
-public class GeocoderHandler extends BasePositionHandler {
+@ChannelHandler.Sharable
+public class GeocoderHandler extends ChannelInboundHandlerAdapter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GeocoderHandler.class);
 
@@ -42,34 +46,39 @@ public class GeocoderHandler extends BasePositionHandler {
     }
 
     @Override
-    public void handlePosition(Position position, Callback callback) {
-        if (!ignorePositions && (processInvalidPositions || position.getValid())) {
-            if (reuseDistance != 0) {
-                Position lastPosition = cacheManager.getPosition(position.getDeviceId());
-                if (lastPosition != null && lastPosition.getAddress() != null
-                        && position.getDouble(Position.KEY_DISTANCE) <= reuseDistance) {
-                    position.setAddress(lastPosition.getAddress());
-                    callback.processed(false);
-                    return;
+    public void channelRead(final ChannelHandlerContext ctx, Object message) {
+        if (message instanceof Position && !ignorePositions) {
+            final Position position = (Position) message;
+            if (processInvalidPositions || position.getValid()) {
+                if (reuseDistance != 0) {
+                    Position lastPosition = cacheManager.getPosition(position.getDeviceId());
+                    if (lastPosition != null && lastPosition.getAddress() != null
+                            && position.getDouble(Position.KEY_DISTANCE) <= reuseDistance) {
+                        position.setAddress(lastPosition.getAddress());
+                        ctx.fireChannelRead(position);
+                        return;
+                    }
                 }
+
+                geocoder.getAddress(position.getLatitude(), position.getLongitude(),
+                        new Geocoder.ReverseGeocoderCallback() {
+                    @Override
+                    public void onSuccess(String address) {
+                        position.setAddress(address);
+                        ctx.fireChannelRead(position);
+                    }
+
+                    @Override
+                    public void onFailure(Throwable e) {
+                        LOGGER.warn("Geocoding failed", e);
+                        ctx.fireChannelRead(position);
+                    }
+                });
+            } else {
+                ctx.fireChannelRead(position);
             }
-
-            geocoder.getAddress(position.getLatitude(), position.getLongitude(),
-                    new Geocoder.ReverseGeocoderCallback() {
-                @Override
-                public void onSuccess(String address) {
-                    position.setAddress(address);
-                    callback.processed(false);
-                }
-
-                @Override
-                public void onFailure(Throwable e) {
-                    LOGGER.warn("Geocoding failed", e);
-                    callback.processed(false);
-                }
-            });
         } else {
-            callback.processed(false);
+            ctx.fireChannelRead(message);
         }
     }
 

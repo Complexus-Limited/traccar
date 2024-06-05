@@ -20,7 +20,6 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
-import org.traccar.helper.BufferUtil;
 import org.traccar.session.DeviceSession;
 import org.traccar.NetworkMessage;
 import org.traccar.Protocol;
@@ -170,9 +169,7 @@ public class KhdProtocolDecoder extends BaseProtocolDecoder {
                     position.set(Position.KEY_FUEL_LEVEL, BitUtil.from(odometer, 16));
                 }
 
-                long status = buf.readUnsignedInt();
-                position.set(Position.KEY_IGNITION, !BitUtil.check(status, 7 + 3 * 8));
-                position.set(Position.KEY_STATUS, status);
+                position.set(Position.KEY_STATUS, buf.readUnsignedInt());
 
                 buf.readUnsignedShort();
                 buf.readUnsignedByte();
@@ -188,7 +185,8 @@ public class KhdProtocolDecoder extends BaseProtocolDecoder {
                     buf.readUnsignedShort(); // data length
 
                     int dataType = buf.readUnsignedByte();
-                    int dataLength = buf.readUnsignedByte();
+
+                    buf.readUnsignedByte(); // content length
 
                     switch (dataType) {
                         case 0x01:
@@ -198,20 +196,6 @@ public class KhdProtocolDecoder extends BaseProtocolDecoder {
                         case 0x02:
                             position.set(Position.PREFIX_TEMP + 1,
                                     buf.readUnsignedByte() * 100 + buf.readUnsignedByte());
-                            break;
-                        case 0x05:
-                            int sign = buf.readUnsignedByte();
-                            switch (sign) {
-                                case 1:
-                                    position.set("sign", true);
-                                    break;
-                                case 2:
-                                    position.set("sign", false);
-                                    break;
-                                default:
-                                    break;
-                            }
-                            position.set(Position.KEY_DRIVER_UNIQUE_ID, BufferUtil.readString(buf, dataLength - 1));
                             break;
                         case 0x18:
                             for (int i = 1; i <= 4; i++) {

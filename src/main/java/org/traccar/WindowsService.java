@@ -170,7 +170,7 @@ public abstract class WindowsService {
 
     public abstract void run();
 
-    private final class ServiceMain implements SERVICE_MAIN_FUNCTION {
+    private class ServiceMain implements SERVICE_MAIN_FUNCTION {
 
         public void callback(int dwArgc, Pointer lpszArgv) {
             ServiceControl serviceControl = new ServiceControl();
@@ -203,7 +203,7 @@ public abstract class WindowsService {
 
     }
 
-    private final class ServiceControl implements HandlerEx {
+    private class ServiceControl implements HandlerEx {
 
         public int callback(int dwControl, int dwEventType, Pointer lpEventData, Pointer lpContext) {
             switch (dwControl) {

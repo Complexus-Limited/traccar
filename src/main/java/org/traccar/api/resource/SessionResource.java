@@ -79,8 +79,8 @@ public class SessionResource extends BaseResource {
 
         if (token != null) {
             LoginResult loginResult = loginService.login(token);
-            if (loginResult != null) {
-                User user = loginResult.getUser();
+            User user = loginResult.getUser();
+            if (user != null) {
                 request.getSession().setAttribute(USER_ID_KEY, user.getId());
                 request.getSession().setAttribute(EXPIRATION_KEY, loginResult.getExpiration());
                 LogAction.login(user.getId(), WebHelper.retrieveRemoteAddress(request));
@@ -116,9 +116,9 @@ public class SessionResource extends BaseResource {
             @FormParam("email") String email,
             @FormParam("password") String password,
             @FormParam("code") Integer code) throws StorageException {
-        LoginResult loginResult;
+        User user;
         try {
-            loginResult = loginService.login(email, password, code);
+            user = loginService.login(email, password, code).getUser();
         } catch (CodeRequiredException e) {
             Response response = Response
                     .status(Response.Status.UNAUTHORIZED)
@@ -126,8 +126,7 @@ public class SessionResource extends BaseResource {
                     .build();
             throw new WebApplicationException(response);
         }
-        if (loginResult != null) {
-            User user = loginResult.getUser();
+        if (user != null) {
             request.getSession().setAttribute(USER_ID_KEY, user.getId());
             LogAction.login(user.getId(), WebHelper.retrieveRemoteAddress(request));
             return user;

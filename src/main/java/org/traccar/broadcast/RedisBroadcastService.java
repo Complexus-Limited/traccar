@@ -38,6 +38,7 @@ public class RedisBroadcastService extends BaseBroadcastService {
 
     private final ExecutorService service = Executors.newSingleThreadExecutor();
 
+    private final String url;
     private final String channel = "traccar";
 
     private Jedis subscriber;
@@ -47,7 +48,7 @@ public class RedisBroadcastService extends BaseBroadcastService {
 
     public RedisBroadcastService(Config config, ObjectMapper objectMapper) throws IOException {
         this.objectMapper = objectMapper;
-        String url = config.getString(Keys.BROADCAST_ADDRESS);
+        url = config.getString(Keys.BROADCAST_ADDRESS);
 
         try {
             subscriber = new Jedis(url);
@@ -68,7 +69,9 @@ public class RedisBroadcastService extends BaseBroadcastService {
         try {
             String payload = id  + ":" + objectMapper.writeValueAsString(message);
             publisher.publish(channel, payload);
-        } catch (IOException | JedisConnectionException e) {
+        } catch (IOException e) {
+            LOGGER.warn("Broadcast failed", e);
+        } catch (JedisConnectionException e) {
             LOGGER.warn("Broadcast failed", e);
         }
     }
@@ -111,11 +114,13 @@ public class RedisBroadcastService extends BaseBroadcastService {
                             if (messageChannel.equals(channel) && parts.length == 2 && !id.equals(parts[0])) {
                                 handleMessage(objectMapper.readValue(parts[1], BroadcastMessage.class));
                             }
-                        } catch (Exception e) {
+                        } catch (IOException e) {
                             LOGGER.warn("Broadcast handleMessage failed", e);
                         }
                     }
                 }, channel);
+            } catch (JedisConnectionException e) {
+                throw new RuntimeException(e);
             } catch (JedisException e) {
                 throw new RuntimeException(e);
             }

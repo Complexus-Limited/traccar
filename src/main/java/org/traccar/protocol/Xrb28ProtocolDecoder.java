@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2018 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import org.traccar.model.Command;
 import org.traccar.model.Position;
 
 import java.net.SocketAddress;
-import java.util.Arrays;
 import java.util.regex.Pattern;
 
 public class Xrb28ProtocolDecoder extends BaseProtocolDecoder {
@@ -47,7 +46,6 @@ public class Xrb28ProtocolDecoder extends BaseProtocolDecoder {
             .expression("....,")
             .expression("..,")                   // vendor
             .number("d{15},")                    // imei
-            .number("d{12},").optional()         // time
             .expression("..,")                   // type
             .number("[01],")                     // reserved
             .number("(dd)(dd)(dd).d+,")          // time (hhmmss)
@@ -69,44 +67,23 @@ public class Xrb28ProtocolDecoder extends BaseProtocolDecoder {
             Channel channel, SocketAddress remoteAddress, Object msg) throws Exception {
 
         String sentence = (String) msg;
-        String[] values = sentence.replaceAll("#$", "").split(",");
 
-        int index = 0;
-        String header = values[index++];
-        String vendor = values[index++];
-
-        String imei = values[index++];
-        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, imei);
+        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, sentence.substring(9, 24));
         if (deviceSession == null) {
             return null;
         }
 
-        String time;
-        if (values[index].length() == 12) {
-            time = values[index++];
-        } else {
-            time = null;
-        }
-
-        String type = values[index++];
+        String type = sentence.substring(25, 27);
         if (channel != null) {
-            StringBuilder response = new StringBuilder("\u00ff\u00ff");
-            response.append(header.replaceAll("R$", "S")).append(',');
-            response.append(vendor).append(',');
-            response.append(imei).append(',');
-            if (time != null) {
-                response.append(time).append(',');
-            }
             if (type.matches("L0|L1|W0|E1")) {
-                response.append(type).append("#\n");
-                channel.write(new NetworkMessage(response.toString(), remoteAddress));
+                channel.write(new NetworkMessage(
+                        "\u00ff\u00ff*SCOS" + sentence.substring(5, 27) + "#\n",
+                        remoteAddress));
             } else if (type.equals("R0") && pendingCommand != null) {
-                String command = pendingCommand.equals(Command.TYPE_ALARM_ARM) ? "L1" : "L0";
-                response.append(command);
-                String[] remaining = Arrays.copyOfRange(values, index, values.length);
-                response.append(String.join(",", remaining));
-                response.append("#\n");
-                channel.write(new NetworkMessage(response.toString(), remoteAddress));
+                String command = pendingCommand.equals(Command.TYPE_ALARM_ARM) ? "L1," : "L0,";
+                channel.write(new NetworkMessage(
+                        "\u00ff\u00ff*SCOS" + sentence.substring(5, 25) + command + sentence.substring(30) + "\n",
+                        remoteAddress));
                 pendingCommand = null;
             }
         }
@@ -117,6 +94,11 @@ public class Xrb28ProtocolDecoder extends BaseProtocolDecoder {
             position.setDeviceId(deviceSession.getDeviceId());
 
             getLastLocation(position, null);
+
+            String payload = sentence.substring(25, sentence.length() - 1);
+
+            int index = 0;
+            String[] values = payload.substring(3).split(",");
 
             switch (type) {
                 case "Q0":
@@ -164,8 +146,7 @@ public class Xrb28ProtocolDecoder extends BaseProtocolDecoder {
                 case "K0":
                 case "I0":
                 case "M0":
-                    String[] remaining = Arrays.copyOfRange(values, index, values.length);
-                    position.set(Position.KEY_RESULT, String.join(",", remaining));
+                    position.set(Position.KEY_RESULT, payload);
                     break;
                 default:
                     break;
