@@ -197,6 +197,8 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                 "FMB140", "FMU125", "FMB900", "FMB920", "FMB962", "FMB964", "FM3001", "FMB202", "FMB204", "FMB206",
                 "FMT100", "MTB100", "FMP100", "MSP500", "FMC125", "FMM125", "FMU130", "FMC130", "FMM130", "FMB150",
                 "FMC150", "FMM150", "FMC920");
+        var tmtXXX = Set.of(
+                "TMT250", "GH5200");
 
         register(1, null, (p, b) -> p.set(Position.PREFIX_IN + 1, b.readUnsignedByte() > 0));
         register(2, null, (p, b) -> p.set(Position.PREFIX_IN + 2, b.readUnsignedByte() > 0));
@@ -211,8 +213,32 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(17, null, (p, b) -> p.set("axisX", b.readShort()));
         register(18, null, (p, b) -> p.set("axisY", b.readShort()));
         register(19, null, (p, b) -> p.set("axisZ", b.readShort()));
-        register(21, null, (p, b) -> p.set(Position.KEY_RSSI, b.readUnsignedByte()));
-        register(24, fmbXXX, (p, b) -> p.setSpeed(UnitsConverter.knotsFromKph(b.readUnsignedShort())));
+        register(21, null, (p, b) -> {
+            switch (b.readUnsignedByte()) {
+                case 0:
+                    p.set(Position.KEY_RSSI, 0 );
+                    break;
+                case 1:    
+                    p.set(Position.KEY_RSSI, 20 );
+                    break;
+                case 2:    
+                    p.set(Position.KEY_RSSI, 40 );
+                    break;
+                case 3:    
+                    p.set(Position.KEY_RSSI, 60 );
+                    break;
+                case 4:    
+                    p.set(Position.KEY_RSSI, 80 );
+                    break;
+                case 5:    
+                    p.set(Position.KEY_RSSI, 100 );
+                    break;
+                default:
+                    p.set(Position.KEY_RSSI, b.readUnsignedByte());
+                    break;
+                }
+        });
+        register(24, null, (p, b) -> p.setSpeed(UnitsConverter.knotsFromKph(b.readUnsignedShort())));
         register(25, null, (p, b) -> p.set("bleTemp1", b.readShort() * 0.01));
         register(26, null, (p, b) -> p.set("bleTemp2", b.readShort() * 0.01));
         register(27, null, (p, b) -> p.set("bleTemp3", b.readShort() * 0.01));
@@ -222,6 +248,25 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(66, null, (p, b) -> p.set(Position.KEY_POWER, b.readUnsignedShort() * 0.001));
         register(67, null, (p, b) -> p.set(Position.KEY_BATTERY, b.readUnsignedShort() * 0.001));
         register(68, fmbXXX, (p, b) -> p.set("batteryCurrent", b.readUnsignedShort() * 0.001));
+        register(69, null, (p, b) -> {
+            switch (b.readUnsignedByte()) {
+                    case 0:
+                        p.set(Position.KEY_GPS, "GNSS Off");
+                        break;
+                    case 1:
+                        p.set(Position.KEY_GPS, "GNSS On wtih fix");
+                        break;
+                    case 2:
+                        p.set(Position.KEY_GPS, "GNSS On without fix");
+                        break;
+                    case 3:
+                        p.set(Position.KEY_GPS, "GNSS Sleep");
+                        break;
+                    default:
+                        p.set(Position.KEY_GPS, b.readUnsignedByte());
+                        break;	
+                }        
+        });
         register(72, fmbXXX, (p, b) -> p.set(Position.PREFIX_TEMP + 1, b.readInt() * 0.1));
         register(73, fmbXXX, (p, b) -> p.set(Position.PREFIX_TEMP + 2, b.readInt() * 0.1));
         register(74, fmbXXX, (p, b) -> p.set(Position.PREFIX_TEMP + 3, b.readInt() * 0.1));
@@ -241,8 +286,9 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(87, fmbXXX, (p, b) -> p.set(Position.KEY_OBD_ODOMETER, b.readUnsignedInt()));
         register(89, fmbXXX, (p, b) -> p.set("fuelLevelPercentage", b.readUnsignedByte()));
         register(110, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_CONSUMPTION, b.readUnsignedShort() * 0.1));
-        register(113, fmbXXX, (p, b) -> p.set(Position.KEY_BATTERY_LEVEL, b.readUnsignedByte()));
-        register(115, fmbXXX, (p, b) -> p.set("engineTemp", b.readShort() * 0.1));
+        register(113, null, (p, b) -> p.set(Position.KEY_BATTERY_LEVEL, b.readUnsignedByte()));
+        register(115, fmbXXX, (p, b) -> p.set(Position.KEY_ENGINE_TEMP, b.readShort() * 0.1));
+        register(116, tmtXXX, (p, b) -> p.set(Position.KEY_CHARGE, b.readUnsignedByte()));
         register(701, Set.of("FMC640", "FMC650", "FMM640"), (p, b) -> p.set("bleTemp1", b.readShort() * 0.01));
         register(702, Set.of("FMC640", "FMC650", "FMM640"), (p, b) -> p.set("bleTemp2", b.readShort() * 0.01));
         register(703, Set.of("FMC640", "FMC650", "FMM640"), (p, b) -> p.set("bleTemp3", b.readShort() * 0.01));
@@ -264,7 +310,84 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         });
         register(239, null, (p, b) -> p.set(Position.KEY_IGNITION, b.readUnsignedByte() > 0));
         register(240, null, (p, b) -> p.set(Position.KEY_MOTION, b.readUnsignedByte() > 0));
-        register(241, null, (p, b) -> p.set(Position.KEY_OPERATOR, b.readUnsignedInt()));
+        register(241, null, (p, b) -> {
+            switch ((int) b.readUnsignedInt()) {
+                case 2342:
+                    p.set(Position.KEY_OPERATOR, "o2");
+                    break;
+                case 2343:
+                    p.set(Position.KEY_OPERATOR, "Vodafone");
+                    break;
+                case 2352:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23231:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23410:
+                    p.set(Position.KEY_OPERATOR, "o2");
+                    break;
+                case 23411:
+                    p.set(Position.KEY_OPERATOR, "o2");
+                    break;
+                case 23415:
+                    p.set(Position.KEY_OPERATOR, "Vodafone");
+                    break;
+                case 23420:
+                    p.set(Position.KEY_OPERATOR, "Three");
+                    break;
+                case 23427:
+                    p.set(Position.KEY_OPERATOR, "Vodafone"); 
+					break;
+                case 23430:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23432:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23433:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23434:
+                    p.set(Position.KEY_OPERATOR, "EE");
+                    break;
+                case 23451:
+                    p.set(Position.KEY_OPERATOR, "Jersey Telecom");
+                    break;
+                case 23455:
+                    p.set(Position.KEY_OPERATOR, "Guernsey Telecoms");
+                    break;
+                case 23476:
+                    p.set(Position.KEY_OPERATOR, "BT");
+                    break;
+                case 23477:
+                    p.set(Position.KEY_OPERATOR, "BT");
+					break;
+                case 23491:
+                    p.set(Position.KEY_OPERATOR, "Vodafone");
+                    break;
+                case 23494:
+                    p.set(Position.KEY_OPERATOR, "Three");
+                    break;
+				default:
+                    p.set(Position.KEY_OPERATOR, b.readUnsignedInt());
+                    break;	
+            }
+        });
+        register(242, null, (p, b) -> {
+            switch (b.readUnsignedByte()) {
+                case 0: 
+                    p.set(Position.KEY_MAN_DOWN,0);
+                    break;
+                case 1:
+                    p.set(Position.KEY_ALARM, Position.ALARM_FALL_DOWN);
+                    p.set(Position.KEY_MAN_DOWN,1);
+                    break;
+                default:
+                    p.set(Position.KEY_MAN_DOWN,0);
+                    break;
+            }
+        });
         register(246, fmbXXX, (p, b) -> {
             p.addAlarm(b.readUnsignedByte() > 0 ? Position.ALARM_TOW : null);
         });
@@ -278,7 +401,18 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
             p.addAlarm(b.readUnsignedByte() > 0 ? Position.ALARM_IDLE : null);
         });
         register(252, fmbXXX, (p, b) -> {
-            p.addAlarm(b.readUnsignedByte() > 0 ? Position.ALARM_POWER_CUT : null);
+            switch (b.readUnsignedByte()) {
+                case 0: 
+                    p.set(Position.KEY_UNPLUGGED,0);
+                    break;
+                case 1:
+                    p.set(Position.KEY_ALARM, Position.ALARM_REMOVING);
+                    p.set(Position.KEY_UNPLUGGED,1);
+                    break;
+                default:
+                    p.set(Position.KEY_UNPLUGGED,0);
+                    break;
+            }
         });
         register(253, null, (p, b) -> {
             switch (b.readUnsignedByte()) {
@@ -287,6 +421,74 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                 case 3 -> p.addAlarm(Position.ALARM_CORNERING);
             }
         });
+        register(389, tmtXXX, (p, b) -> {
+            String X,Y;
+            String button_combo = ByteBufUtil.hexDump(b.readSlice(1));
+            int button = Integer.parseInt(button_combo.substring(0,1));
+            switch(button) {
+                case 1:
+                    X = "Alarm button";
+                    break;
+                case 2:
+                    X = "Power button";
+                    break;
+                case 3:
+                    X = "Button 1";
+                    break;
+                case 4:
+                    X = "Button 2";
+                    break;
+                case 5:
+                    X = "Button 3";
+                    break;
+                default:
+                    X = "Uknown button";
+                    break;
+            }
+            int action = Integer.parseInt(button_combo.substring(1,2));
+            switch(action) {
+                case 1:
+                    Y = "single click";
+                    break;
+                case 2:
+                    Y = "double click";
+                    break;
+                case 3:
+                    Y = "long click";
+                    break;
+                default:
+                    Y = "uknown action";
+                    break;
+            }
+        p.set(Position.KEY_BUTTON_PRESS, X + " " + Y);
+        });
+        register(390, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_LEVEL, b.readUnsignedInt() * 0.1 ));
+        register(390, tmtXXX, (p, b) -> p.set(Position.KEY_STATUS, b.readUnsignedInt()));
+        register(400, tmtXXX, (p, b) -> {
+            switch (b.readUnsignedByte()) {
+                case 0: 
+                    p.set(Position.KEY_AMBER_ALERT_STATE,"Off");
+                    break;
+                case 1:
+                    p.set(Position.KEY_AMBER_ALERT_STATE,"Timer On");
+                    p.set(Position.KEY_ALARM, Position.ALARM_AMBER_ON);
+                    break;
+                case 2:
+                    p.set(Position.KEY_AMBER_ALERT_STATE,"Timer Reset");
+                    p.set(Position.KEY_ALARM, Position.ALARM_AMBER_TIMER_RESET);
+                    break;
+                case 3: 
+                    p.set(Position.KEY_AMBER_ALERT_STATE, "Timer Exceeded");
+                    p.set(Position.KEY_ALARM, Position.ALARM_AMBER_ALERT);
+                    break;
+                case 4:
+                    p.set(Position.KEY_AMBER_ALERT_STATE, "No Timer");  
+                    break;         
+                default:
+                    p.set(Position.KEY_AMBER_ALERT_STATE,"N/A");
+                    break;
+            }
+        });                 
         register(636, fmbXXX, (p, b) -> p.set("cid4g", b.readUnsignedInt()));
         register(662, fmbXXX, (p, b) -> p.set(Position.KEY_DOOR, b.readUnsignedByte() > 0));
         register(10800, fmbXXX, (p, b) -> p.set("eyeTemp1", b.readShort() / 100.0));
