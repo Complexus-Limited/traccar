@@ -82,6 +82,7 @@ public class Position extends Message {
     public static final String KEY_HUMIDITY = "humidity";
     public static final String KEY_DEVICE_TEMP = "deviceTemp"; // celsius
     public static final String KEY_COOLANT_TEMP = "coolantTemp"; // celsius
+    public static final String KEY_ENGINE_TEMP = "engineTemp"; // celsius
     public static final String KEY_ENGINE_LOAD = "engineLoad";
     public static final String KEY_OPERATOR = "operator";
     public static final String KEY_COMMAND = "command";
@@ -94,6 +95,11 @@ public class Position extends Message {
     public static final String KEY_PHONE = "phone";
     public static final String KEY_SPEED_LIMIT = "speedLimit";
     public static final String KEY_DRIVING_TIME = "drivingTime";
+    public static final String KEY_UNPLUGGED = "unplugged";
+    public static final String KEY_AMBER_ALERT_STATE = "amberAlertState";
+    public static final String KEY_MAN_DOWN = "manDown";
+    public static final String KEY_BUTTON_PRESS = "buttonPress";
+    public static final String KEY_RISK = "risk";
 
     public static final String KEY_DTCS = "dtcs";
     public static final String KEY_OBD_SPEED = "obdSpeed"; // km/h
@@ -150,6 +156,10 @@ public class Position extends Message {
     public static final String ALARM_FUEL_LEAK = "fuelLeak";
     public static final String ALARM_TAMPERING = "tampering";
     public static final String ALARM_REMOVING = "removing";
+    public static final String ALARM_AMBER_ON = "amberOn";
+    public static final String ALARM_AMBER_ALERT = "amberAlert";
+    public static final String ALARM_AMBER_TIMER_RESET = "amberTimerReset";
+    public static final String ALARM_RISK_LEVEL = "riskLevel";
 
     public Position() {
     }

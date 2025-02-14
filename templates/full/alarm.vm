@@ -76,6 +76,14 @@
 	#set($alarmName = "Tampering")
 #elseif($alarmName == "removing")
 	#set($alarmName = "Removing")
+#elseif($alarmName == "amberOn")
+	#set($alarmName = "Amber On")
+#elseif($alarmName == "amberAlert")
+	#set($alarmName = "Amber Alert")
+#elseif($alarmName == "amberTimerReset")
+	#set($alarmName = "Amber Timer Reset")
+#elseif($alarmName == "riskLevel")
+	#set($alarmName = "Risk Level")
 #end
 <!DOCTYPE html>
 <html>

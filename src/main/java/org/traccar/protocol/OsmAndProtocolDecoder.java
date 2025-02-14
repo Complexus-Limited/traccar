@@ -146,6 +146,15 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
                     case "charge":
                         position.set(Position.KEY_CHARGE, Boolean.parseBoolean(value));
                         break;
+                    case "sos":
+                        position.set(Position.KEY_ALARM, Position.ALARM_SOS);
+                        break;
+                    case "lowbattery":
+                        position.set(Position.KEY_ALARM, Position.ALARM_LOW_BATTERY);
+                        break;
+                    case "event":
+                        position.set(Position.KEY_EVENT, value);
+                        break;
                     default:
                         try {
                             position.set(entry.getKey(), Double.parseDouble(value));
