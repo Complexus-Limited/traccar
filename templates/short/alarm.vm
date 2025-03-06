@@ -17,7 +17,7 @@
 #elseif($alarmName == "lowPower")
 	#set($alarmName = "Low Power")
 #elseif($alarmName == "lowBattery")
-	#set($alarmName = "Low Battery")
+	#set($alarmName = "Low Device Battery")
 #elseif($alarmName == "fault")
 	#set($alarmName = "Fault")
 #elseif($alarmName == "powerOff")
