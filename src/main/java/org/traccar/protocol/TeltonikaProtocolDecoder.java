@@ -306,7 +306,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(234, fmbXXX, (p, b) -> p.set("cngLevel", b.readUnsignedShort()));
         register(235, fmbXXX, (p, b) -> p.set("oilLevel", b.readUnsignedByte()));
         register(236, null, (p, b) -> {
-            p.addAlarm(b.readUnsignedByte() > 0 ? Position.ALARM_GENERAL : null);
+            p.addAlarm(b.readUnsignedByte() > 0 ? Position.ALARM_SOS : null);
         });
         register(239, null, (p, b) -> p.set(Position.KEY_IGNITION, b.readUnsignedByte() > 0));
         register(240, null, (p, b) -> p.set(Position.KEY_MOTION, b.readUnsignedByte() > 0));
