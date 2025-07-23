@@ -17,7 +17,6 @@
 package org.traccar.api.resource;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.ws.rs.core.Context;
 import org.traccar.api.SimpleObjectResource;
 import org.traccar.helper.LogAction;
 import org.traccar.model.Event;
@@ -29,11 +28,13 @@ import org.traccar.reports.DevicesReportProvider;
 import org.traccar.reports.EventsReportProvider;
 import org.traccar.reports.RouteReportProvider;
 import org.traccar.reports.StopsReportProvider;
+import org.traccar.reports.GeofenceTimeReportProvider;
 import org.traccar.reports.SummaryReportProvider;
 import org.traccar.reports.TripsReportProvider;
 import org.traccar.reports.common.ReportExecutor;
 import org.traccar.reports.common.ReportMailer;
 import org.traccar.reports.model.CombinedReportItem;
+import org.traccar.reports.model.GeofenceTimeRecord;
 import org.traccar.reports.model.StopReportItem;
 import org.traccar.reports.model.SummaryReportItem;
 import org.traccar.reports.model.TripReportItem;
@@ -41,6 +42,7 @@ import org.traccar.storage.StorageException;
 
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -61,6 +63,9 @@ import java.util.List;
 public class ReportResource extends SimpleObjectResource<Report> {
 
     private static final String EXCEL = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    @Inject
+    private GeofenceTimeReportProvider geofenceTimeReportProvider;
 
     @Inject
     private CombinedReportProvider combinedReportProvider;
@@ -89,7 +94,7 @@ public class ReportResource extends SimpleObjectResource<Report> {
     @Inject
     private LogAction actionLogger;
 
-    @Context
+    @Inject
     private HttpServletRequest request;
 
     public ReportResource() {
@@ -111,6 +116,49 @@ public class ReportResource extends SimpleObjectResource<Report> {
             return Response.ok(stream)
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report.xlsx").build();
         }
+    }
+
+    @GET
+    @Path("geofence-time")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Collection<GeofenceTimeRecord> getGeofenceTimeReport(
+            @QueryParam("deviceId") List<Long> deviceIds,
+            @QueryParam("groupId") List<Long> groupIds,
+            @QueryParam("from") Date from,
+            @QueryParam("to") Date to,
+            @QueryParam("grouped") @DefaultValue("true") boolean grouped) throws StorageException {
+
+        Long userId = getUserId();
+        return geofenceTimeReportProvider.getGeofenceTimes(userId, deviceIds, groupIds, from, to, grouped);
+    }
+
+    @Path("geofence-time/xlsx")
+    @GET
+    @Produces(EXCEL)
+    public Response getGeofenceTimeExcel(
+            @QueryParam("deviceId") List<Long> deviceIds,
+            @QueryParam("groupId") List<Long> groupIds,
+            @QueryParam("from") Date from,
+            @QueryParam("to") Date to,
+            @QueryParam("grouped") boolean grouped,
+            @QueryParam("mail") boolean mail) throws StorageException {
+
+        return executeReport(getUserId(), mail, stream -> geofenceTimeReportProvider.getExcel(stream, getUserId(),
+                deviceIds, groupIds, from, to, grouped));
+    }
+
+    @Path("geofence-time/{type:xlsx|mail}")
+    @GET
+    @Produces(EXCEL)
+    public Response getGeofenceTimeExcelWithPath(
+            @QueryParam("deviceId") List<Long> deviceIds,
+            @QueryParam("groupId") List<Long> groupIds,
+            @QueryParam("from") Date from,
+            @QueryParam("to") Date to,
+            @QueryParam("grouped") boolean grouped,
+            @PathParam("type") String type) throws StorageException {
+
+        return getGeofenceTimeExcel(deviceIds, groupIds, from, to, grouped, type.equals("mail"));
     }
 
     @Path("combined")
