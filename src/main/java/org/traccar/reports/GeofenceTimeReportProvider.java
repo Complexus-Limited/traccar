@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
@@ -44,20 +43,6 @@ public class GeofenceTimeReportProvider {
         this.storage = storage;
     }
 
-    /**
-     * Generate Excel report for geofence time.
-     *
-     * @param outputStream Excel output stream
-     * @param userId       User ID
-     * @param deviceIds    Device IDs filter
-     * @param groupIds     Group IDs filter
-     * @param from         Start date
-     * @param to           End date
-     * @param grouped      Whether to group by geofence only or include device
-     *                     breakdown
-     * @throws StorageException on storage errors
-     * @throws IOException      on IO errors
-     */
     public void getExcel(OutputStream outputStream, long userId,
             List<Long> deviceIds, List<Long> groupIds,
             Date from, Date to, boolean grouped) throws StorageException, IOException {
@@ -76,18 +61,6 @@ public class GeofenceTimeReportProvider {
         }
     }
 
-    /**
-     * Fetch geofence time data either grouped by geofence or detailed by device.
-     *
-     * @param userId    User ID
-     * @param deviceIds Device filter
-     * @param groupIds  Group filter
-     * @param from      Start date
-     * @param to        End date
-     * @param grouped   True for grouping by geofence only
-     * @return Collection of geofence time records
-     * @throws StorageException on storage errors
-     */
     public Collection<GeofenceTimeRecord> getGeofenceTimes(
             long userId, Collection<Long> deviceIds, Collection<Long> groupIds,
             Date from, Date to, boolean grouped) throws StorageException {
@@ -146,7 +119,9 @@ public class GeofenceTimeReportProvider {
                                 }
                             });
                         } else {
-                            String key = device.getId() + "-" + geofenceId;
+
+                            String dateKey = new java.text.SimpleDateFormat("yyyy-MM-dd").format(enterTime);
+                            String key = device.getId() + "-" + geofenceId + "-" + dateKey;
                             detailedMap.compute(key, (k, existing) -> {
                                 if (existing == null) {
                                     GeofenceTimeRecord record = new GeofenceTimeRecord();
@@ -155,12 +130,14 @@ public class GeofenceTimeReportProvider {
                                     record.setGeofenceId(geofenceId);
                                     record.setGeofenceName(geofenceNames.getOrDefault(geofenceId, "Unknown"));
                                     record.setDuration(durationSeconds);
+                                    record.setDate(java.sql.Date.valueOf(dateKey));
                                     return record;
                                 } else {
                                     existing.setDuration(existing.getDuration() + durationSeconds);
                                     return existing;
                                 }
                             });
+
                         }
                     }
                 }

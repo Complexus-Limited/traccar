@@ -1,5 +1,7 @@
 package org.traccar.reports.model;
 
+import java.util.Date;
+
 public class GeofenceTimeRecord {
 
     private long deviceId;
@@ -8,6 +10,16 @@ public class GeofenceTimeRecord {
     private long duration; // in seconds
 
     private String geofenceName;
+
+    private Date date;
+
+    public Date getDate() {
+        return date;
+    }
+
+    public void setDate(Date date) {
+        this.date = date;
+    }
 
     public String getGeofenceName() {
         return geofenceName;
