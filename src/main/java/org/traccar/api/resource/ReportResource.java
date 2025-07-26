@@ -142,7 +142,8 @@ public class ReportResource extends SimpleObjectResource<Report> {
             @QueryParam("to") Date to,
             @QueryParam("grouped") boolean grouped,
             @QueryParam("mail") boolean mail) throws StorageException {
-
+        permissionsService.checkRestriction(getUserId(), UserRestrictions::getDisableReports);
+        actionLogger.report(request, getUserId(), false, "geofence-time", from, to, deviceIds, groupIds);
         return executeReport(getUserId(), mail, stream -> geofenceTimeReportProvider.getExcel(stream, getUserId(),
                 deviceIds, groupIds, from, to, grouped));
     }
@@ -157,7 +158,6 @@ public class ReportResource extends SimpleObjectResource<Report> {
             @QueryParam("to") Date to,
             @QueryParam("grouped") boolean grouped,
             @PathParam("type") String type) throws StorageException {
-
         return getGeofenceTimeExcel(deviceIds, groupIds, from, to, grouped, type.equals("mail"));
     }
 

@@ -43,6 +43,17 @@ public class GeofenceTimeReportProvider {
         this.storage = storage;
     }
 
+    public class ReportFunctions {
+        public String formatDuration(long totalSeconds) {
+            long days = totalSeconds / 86400;
+            long hours = (totalSeconds % 86400) / 3600;
+            long minutes = (totalSeconds % 3600) / 60;
+            long seconds = totalSeconds % 60;
+
+            return String.format("%dd %02dh %02dm %02ds", days, hours, minutes, seconds);
+        }
+    }
+
     public void getExcel(OutputStream outputStream, long userId,
             List<Long> deviceIds, List<Long> groupIds,
             Date from, Date to, boolean grouped) throws StorageException, IOException {
@@ -55,6 +66,9 @@ public class GeofenceTimeReportProvider {
             Collection<GeofenceTimeRecord> records = getGeofenceTimes(userId, deviceIds, groupIds, from, to, grouped);
             context.putVar("items", records);
             context.putVar("grouped", grouped);
+            context.putVar("from", from);
+            context.putVar("to", to);
+            context.putVar("utils", new ReportFunctions());
             JxlsHelper.getInstance()
                     .setUseFastFormulaProcessor(false)
                     .processTemplate(inputStream, outputStream, context);
