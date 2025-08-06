@@ -86,7 +86,7 @@
 #elseif($alarmName == "riskLevel")
 	#set($alarmName = "Risk Level")
 #end
-#set($digest = "$device.name alarm: $alarmName at $dateTool.format('yyyy-MM-dd HH:mm:ss', $event.eventTime, $locale, $timezone)")
+#set($digest = "$device.name Alarm: $alarmName at $dateTool.format('yyyy-MM-dd HH:mm:ss', $event.eventTime, $locale, $timezone)")
 <!DOCTYPE html>
 <html>
 <body>
