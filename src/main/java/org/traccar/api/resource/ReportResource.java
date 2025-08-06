@@ -17,6 +17,7 @@
 package org.traccar.api.resource;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.core.Context;
 import org.traccar.api.SimpleObjectResource;
 import org.traccar.helper.LogAction;
 import org.traccar.model.Event;
@@ -94,7 +95,7 @@ public class ReportResource extends SimpleObjectResource<Report> {
     @Inject
     private LogAction actionLogger;
 
-    @Inject
+    @Context
     private HttpServletRequest request;
 
     public ReportResource() {
