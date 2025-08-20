@@ -124,7 +124,20 @@ public class GeofenceTimeReportProvider {
                                 if (existing == null) {
                                     GeofenceTimeRecord record = new GeofenceTimeRecord();
                                     record.setGeofenceId(id);
-                                    record.setGeofenceName(geofenceNames.getOrDefault(id, "Unknown"));
+                                    String geofenceName = "Unknown";
+                                    try {
+                                        Geofence geofence = storage.getObject(Geofence.class, new Request(
+                                                new Columns.Include("name"),
+                                                new Condition.Equals("id", geofenceId)));
+                                        if (geofence != null) {
+                                            geofenceName = geofence.getName();
+                                        }
+                                    } catch (StorageException e) {
+                                        // Optionally log the error
+                                        System.err.println(
+                                                "Failed to fetch geofence name for ID " + geofenceId + ": " + e.getMessage());
+                                    }
+                                    record.setGeofenceName(geofenceName);
                                     record.setDuration(durationSeconds);
                                     return record;
                                 } else {
@@ -142,7 +155,20 @@ public class GeofenceTimeReportProvider {
                                     record.setDeviceId(device.getId());
                                     record.setDeviceName(device.getName());
                                     record.setGeofenceId(geofenceId);
-                                    record.setGeofenceName(geofenceNames.getOrDefault(geofenceId, "Unknown"));
+                                    String geofenceName = "Unknown";
+                                    try {
+                                        Geofence geofence = storage.getObject(Geofence.class, new Request(
+                                                new Columns.Include("name"),
+                                                new Condition.Equals("id", geofenceId)));
+                                        if (geofence != null) {
+                                            geofenceName = geofence.getName();
+                                        }
+                                    } catch (StorageException e) {
+                                        // Optionally log the error
+                                        System.err.println(
+                                                "Failed to fetch geofence name for ID " + geofenceId + ": " + e.getMessage());
+                                    }
+                                    record.setGeofenceName(geofenceName);
                                     record.setDuration(durationSeconds);
                                     record.setDate(java.sql.Date.valueOf(dateKey));
                                     return record;
