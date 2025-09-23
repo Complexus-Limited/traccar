@@ -433,6 +433,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                 case 3 -> p.addAlarm(Position.ALARM_CORNERING);
             }
         });
+        register(254, fmbXXX, (p, b) -> p.set("driverBehaviour", b.readUnsignedByte()));
         register(389, tmtXXX, (p, b) -> {
             String x, y;
             String buttoncombo = ByteBufUtil.hexDump(b.readSlice(1));
