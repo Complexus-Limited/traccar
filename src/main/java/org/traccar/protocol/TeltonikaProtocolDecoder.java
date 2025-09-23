@@ -15,23 +15,6 @@
  */
 package org.traccar.protocol;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
-import org.traccar.BaseProtocolDecoder;
-import org.traccar.helper.BufferUtil;
-import org.traccar.session.DeviceSession;
-import org.traccar.NetworkMessage;
-import org.traccar.Protocol;
-import org.traccar.config.Keys;
-import org.traccar.helper.BitUtil;
-import org.traccar.helper.Checksum;
-import org.traccar.helper.UnitsConverter;
-import org.traccar.model.CellTower;
-import org.traccar.model.Network;
-import org.traccar.model.Position;
-
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -42,6 +25,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+
+import org.traccar.BaseProtocolDecoder;
+import org.traccar.NetworkMessage;
+import org.traccar.Protocol;
+import org.traccar.config.Keys;
+import org.traccar.helper.BitUtil;
+import org.traccar.helper.BufferUtil;
+import org.traccar.helper.Checksum;
+import org.traccar.helper.UnitsConverter;
+import org.traccar.model.CellTower;
+import org.traccar.model.Network;
+import org.traccar.model.Position;
+import org.traccar.session.DeviceSession;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
 
 public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
 
@@ -247,6 +248,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(31, fmbXXX, (p, b) -> p.set(Position.KEY_ENGINE_LOAD, b.readUnsignedByte()));
         register(32, fmbXXX, (p, b) -> p.set(Position.KEY_COOLANT_TEMP, b.readByte()));
         register(36, fmbXXX, (p, b) -> p.set(Position.KEY_RPM, b.readUnsignedShort()));
+        register(39, fmbXXX, (p, b)-> p.set("intakeAirTemp", b.readByte()));
         register(43, fmbXXX, (p, b) -> p.set("milDistance", b.readUnsignedShort()));
         register(57, fmbXXX, (p, b) -> p.set("hybridBatteryLevel", b.readByte()));
         register(66, null, (p, b) -> p.set(Position.KEY_POWER, b.readUnsignedShort() * 0.001));
