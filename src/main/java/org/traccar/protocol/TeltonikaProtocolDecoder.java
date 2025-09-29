@@ -253,6 +253,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(40, fmbXXX, (p, b)-> p.set("maf", b.readUnsignedShort() * 0.01));
         register(41, fmbXXX, (p, b) -> p.set(Position.KEY_THROTTLE, b.readUnsignedByte()));
         register(43, fmbXXX, (p, b) -> p.set("milDistance", b.readUnsignedShort()));
+        register(47, fmbXXX, (p, b) -> p.set("egrError", b.readByte()));
         register(57, fmbXXX, (p, b) -> p.set("hybridBatteryLevel", b.readByte()));
         register(66, null, (p, b) -> p.set(Position.KEY_POWER, b.readUnsignedShort() * 0.001));
         register(67, null, (p, b) -> p.set(Position.KEY_BATTERY, b.readUnsignedShort() * 0.001));
