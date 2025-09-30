@@ -314,7 +314,28 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(181, null, (p, b) -> p.set(Position.KEY_PDOP, b.readUnsignedShort() * 0.1));
         register(182, null, (p, b) -> p.set(Position.KEY_HDOP, b.readUnsignedShort() * 0.1));
         register(199, null, (p, b) -> p.set(Position.KEY_ODOMETER_TRIP, b.readUnsignedInt()));
-        register(200, fmbXXX, (p, b) -> p.set("sleepMode", b.readUnsignedByte()));
+        register(248, null, (p, b) -> {
+            switch (b.readUnsignedByte()) {
+                    case 0:
+                        p.set("sleepMode", "No Sleep");
+                        break;
+                    case 1:
+                        p.set("sleepMode", "GPS Sleep");
+                        break;
+                    case 2:
+                        p.set("sleepMode", "Deep Sleep");
+                        break;
+                    case 3:
+                        p.set("sleepMode", "Online Sleep");
+                        break;
+                    case 4:
+                        p.set("sleepMode", "Ultra Sleep");
+                        break;
+                    default:
+                        p.set("sleepMode", b.readUnsignedByte());
+                        break;
+                }
+        });
         register(205, fmbXXX, (p, b) -> p.set("cid2g", b.readUnsignedShort()));
         register(206, fmbXXX, (p, b) -> p.set("lac", b.readUnsignedShort()));
         register(232, fmbXXX, (p, b) -> p.set("cngStatus", b.readUnsignedByte() > 0));
