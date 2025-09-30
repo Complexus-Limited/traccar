@@ -410,6 +410,22 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(247, fmbXXX, (p, b) -> {
             p.addAlarm(b.readUnsignedByte() > 0 ? Position.ALARM_ACCIDENT : null);
         });
+        register(248, null, (p, b) -> {
+            switch (b.readUnsignedByte()) {
+                    case 0:
+                        p.set("immobiliserState", "Immobiliser Active");
+                        break;
+                    case 1:
+                        p.set("immobiliserState", "Beacon Present");
+                        break;
+                    case 2:
+                        p.set("immobiliserState", "Beacon Present");
+                        break;
+                    default:
+                        p.set("immobiliserState", b.readUnsignedByte());
+                        break;
+                }
+        });
         register(249, fmbXXX, (p, b) -> {
             p.addAlarm(b.readUnsignedByte() > 0 ? Position.ALARM_JAMMING : null);
         });
