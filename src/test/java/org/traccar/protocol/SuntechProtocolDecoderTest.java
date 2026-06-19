@@ -33,6 +33,10 @@ public class SuntechProtocolDecoderTest extends ProtocolTest {
                 Position.KEY_ALARM, Position.ALARM_SOS);
 
         verifyAttribute(decoder, buffer(
+                "ALT;0950030205;3FFFFF;95;1.0.11;0;20251001;19:34:41;02F2F402;334;20;5B11;28;+25.791061;-100.170745;0.00;0.00;17;1;00000000;00000000;134;1;1440,360,360,360;+23.0;0002;AABBCCDDEEFF"),
+                "assign1", "+23.0");
+
+        verifyAttribute(decoder, buffer(
                 "RES;4309999001;04;02;TEST"),
                 Position.KEY_RESULT, "04;02;TEST");
 
@@ -90,7 +94,7 @@ public class SuntechProtocolDecoderTest extends ProtocolTest {
 
         verifyAttribute(decoder, buffer(
                 "ST600UEX;008728327;20;568;20200602;17:10:03;0bf1a893;334;20;2f19;23;+20.514492;-100.743221;000.033;000.00;12;1;41564973;13.17;000000;44;t_0=1C;N_0=0419.0;t_1=22;N_1=0001.0;Q_D=09\n\r;76;113771;4.1;1"),
-                Position.KEY_FUEL_LEVEL, 1050.0);
+                Position.KEY_FUEL, 1050.0);
 
         verifyAttribute(decoder, buffer(
                 "ST300UEX;109003241;08;1026;20190425;17:36:04;04402;+04.722553;-074.052583;000.020;000.00;10;1;0;12.04;010000;51;CabAVL\"CabMensaje,0,58.5,-1.0,,,FinMensaje\"FinAVL\r\n;B1;0000000000;4.1;1"),
@@ -208,6 +212,8 @@ public class SuntechProtocolDecoderTest extends ProtocolTest {
                 Position.KEY_RESULT, "315;PresetA;NTW;0;eseye.com;user;pass;rastreamento.inviocar.com;6011;;;;;RPT;1800;80;80;3;1200;0;0;0;0;EVT;0;10;0;12;3;9;1;30;0;5;7;1;0;0;0;0;0;0;0;9;9;0;0;0;GSM;0;;;;;0;;;;;;;;SVC;1;200;0;0;0;0;1;0;1;0;0;0;0;ADP;T;T;0;;0;0;0;0;0;0;MSR;600;0.10;0.10;0.70;MBV;0.00;0.00;17.20;9.00;18.00;0.00;0.00;NPT;25.0;0;30;0;0;500;300;5;10;100;5;180;100;1;DEV;0;0;0;1;0;0;0;");
         
         verifyAttribute(decoder, buffer("ST300CMD;Res;511848119;319H;Disable1"), Position.KEY_RESULT, "319H;Disable1");
+
+        verifyNull(decoder, buffer("-Error"));
 
         decoder.setProtocolType(1);
 

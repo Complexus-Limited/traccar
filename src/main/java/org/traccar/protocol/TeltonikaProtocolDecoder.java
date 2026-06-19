@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 - 2023 Anton Tananaev (anton@traccar.org)
+ * Copyright 2013 - 2026 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,16 +39,23 @@ import org.traccar.model.Network;
 import org.traccar.model.Position;
 import org.traccar.session.DeviceSession;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 
 public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
 
     private static final int IMAGE_PACKET_MAX = 2048;
 
-    private static final Map<Integer, Map<Set<String>, BiConsumer<Position, ByteBuf>>> PARAMETERS = new HashMap<>();
+    private static final Map<Integer, Map<Predicate<String>, BiConsumer<Position, ByteBuf>>> PARAMETERS =
+            new HashMap<>();
 
     private final boolean connectionless;
     private boolean extended;
@@ -188,8 +195,8 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         };
     }
 
-    private static void register(int id, Set<String> models, BiConsumer<Position, ByteBuf> handler) {
-        PARAMETERS.computeIfAbsent(id, key -> new HashMap<>()).put(models, handler);
+    private static void register(int id, Predicate<String> predicate, BiConsumer<Position, ByteBuf> handler) {
+        PARAMETERS.computeIfAbsent(id, key -> new HashMap<>()).put(predicate, handler);
     }
 
     static {
@@ -543,8 +550,14 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                     break;
             }
         });
-        register(636, fmbXXX, (p, b) -> p.set("cid4g", b.readUnsignedInt()));
+        register(636, fmbXXX.or(tatXXX), (p, b) -> p.set("cid4g", b.readUnsignedInt()));
         register(662, fmbXXX, (p, b) -> p.set(Position.KEY_DOOR, b.readUnsignedByte() > 0));
+        register(10644, fmbXXX, (p, b) -> p.set("tempProbe1", b.readShort() / 100.0));
+        register(10645, fmbXXX, (p, b) -> p.set("tempProbe2", b.readShort() / 100.0));
+        register(10646, fmbXXX, (p, b) -> p.set("tempProbe3", b.readShort() / 100.0));
+        register(10647, fmbXXX, (p, b) -> p.set("tempProbe4", b.readShort() / 100.0));
+        register(10648, fmbXXX, (p, b) -> p.set("tempProbe5", b.readShort() / 100.0));
+        register(10649, fmbXXX, (p, b) -> p.set("tempProbe6", b.readShort() / 100.0));
         register(10800, fmbXXX, (p, b) -> p.set("eyeTemp1", b.readShort() / 100.0));
         register(10801, fmbXXX, (p, b) -> p.set("eyeTemp2", b.readShort() / 100.0));
         register(10802, fmbXXX, (p, b) -> p.set("eyeTemp3", b.readShort() / 100.0));
@@ -560,10 +573,10 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
             case 1 -> position.set(Position.KEY_BATTERY_LEVEL, readValue(buf, length));
             case 2 -> position.set("usbConnected", readValue(buf, length) == 1);
             case 5 -> position.set("uptime", readValue(buf, length));
-            case 20 -> position.set(Position.KEY_HDOP, readValue(buf, length) * 0.1);
-            case 21 -> position.set(Position.KEY_VDOP, readValue(buf, length) * 0.1);
-            case 22 -> position.set(Position.KEY_PDOP, readValue(buf, length) * 0.1);
-            case 67 -> position.set(Position.KEY_BATTERY, readValue(buf, length) * 0.001);
+            case 20 -> position.set(Position.KEY_HDOP, readValue(buf, length) / 10.0);
+            case 21 -> position.set(Position.KEY_VDOP, readValue(buf, length) / 10.0);
+            case 22 -> position.set(Position.KEY_PDOP, readValue(buf, length) / 10.0);
+            case 67 -> position.set(Position.KEY_BATTERY, readValue(buf, length) / 1000.0);
             case 221 -> position.set("button", readValue(buf, length));
             case 222 -> {
                 if (readValue(buf, length) == 1) {
@@ -579,22 +592,17 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
     private void decodeParameter(Position position, int id, ByteBuf buf, int length, int codec, String model) {
         if (codec == CODEC_GH3000) {
             decodeGh3000Parameter(position, id, buf, length);
-        } else {
-            int index = buf.readerIndex();
-            boolean decoded = false;
-            for (var entry : PARAMETERS.getOrDefault(id, new HashMap<>()).entrySet()) {
-                if (entry.getKey() == null || model != null && entry.getKey().contains(model)) {
-                    entry.getValue().accept(position, buf);
-                    decoded = true;
-                    break;
-                }
-            }
-            if (decoded) {
+            return;
+        }
+        int index = buf.readerIndex();
+        for (var entry : PARAMETERS.getOrDefault(id, Map.of()).entrySet()) {
+            if (entry.getKey().test(model)) {
+                entry.getValue().accept(position, buf);
                 buf.readerIndex(index + length);
-            } else {
-                position.set(Position.PREFIX_IO + id, readValue(buf, length));
+                return;
             }
         }
+        position.set(Position.PREFIX_IO + id, readValue(buf, length));
     }
 
     private void decodeCell(
@@ -644,18 +652,12 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
     }
 
     private int readExtByte(ByteBuf buf, int codec, int... codecs) {
-        boolean ext = false;
         for (int c : codecs) {
             if (codec == c) {
-                ext = true;
-                break;
+                return buf.readUnsignedShort();
             }
         }
-        if (ext) {
-            return buf.readUnsignedShort();
-        } else {
-            return buf.readUnsignedByte();
-        }
+        return buf.readUnsignedByte();
     }
 
     private void decodeLocation(Position position, ByteBuf buf, int codec, String model) {
@@ -820,7 +822,7 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                         }
                         position.set("beacon" + index + "Rssi", (int) data.readByte());
                         if (BitUtil.check(flags, 1)) {
-                            position.set("beacon" + index + "Battery", data.readUnsignedShort() * 0.01);
+                            position.set("beacon" + index + "Battery", data.readUnsignedShort() / 100.0);
                         }
                         if (BitUtil.check(flags, 2)) {
                             position.set("beacon" + index + "Temp", data.readUnsignedShort());
