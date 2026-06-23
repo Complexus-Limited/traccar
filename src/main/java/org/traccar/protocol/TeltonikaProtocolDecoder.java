@@ -15,22 +15,29 @@
  */
 package org.traccar.protocol;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.BiConsumer;
+
 import org.traccar.BaseProtocolDecoder;
-import org.traccar.helper.BufferUtil;
-import org.traccar.session.DeviceSession;
 import org.traccar.NetworkMessage;
 import org.traccar.Protocol;
 import org.traccar.config.Keys;
 import org.traccar.helper.BitUtil;
+import org.traccar.helper.BufferUtil;
 import org.traccar.helper.Checksum;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.model.CellTower;
 import org.traccar.model.Network;
 import org.traccar.model.Position;
+import org.traccar.session.DeviceSession;
 
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -214,7 +221,11 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
         register(31, fmbXXX, (p, b) -> p.set(Position.KEY_ENGINE_LOAD, b.readUnsignedByte()));
         register(32, fmbXXX, (p, b) -> p.set(Position.KEY_COOLANT_TEMP, b.readByte()));
         register(36, fmbXXX, (p, b) -> p.set(Position.KEY_RPM, b.readUnsignedShort()));
+        register(39, fmbXXX, (p, b)-> p.set("intakeAirTemp", b.readByte()));
+        register(40, fmbXXX, (p, b)-> p.set("maf", b.readUnsignedShort() * 0.01));
+        register(41, fmbXXX, (p, b) -> p.set(Position.KEY_THROTTLE, b.readUnsignedByte()));
         register(43, fmbXXX, (p, b) -> p.set("milDistance", b.readUnsignedShort()));
+        register(47, fmbXXX, (p, b) -> p.set("egrError", b.readByte()));
         register(57, fmbXXX, (p, b) -> p.set("hybridBatteryLevel", b.readByte()));
         register(66, any, (p, b) -> p.set(Position.KEY_POWER, b.readUnsignedShort() / 1000.0));
         register(67, any, (p, b) -> p.set(Position.KEY_BATTERY, b.readUnsignedShort() / 1000.0));
@@ -270,8 +281,74 @@ public class TeltonikaProtocolDecoder extends BaseProtocolDecoder {
                 case 3 -> p.addAlarm(Position.ALARM_CORNERING);
             }
         });
-        register(175, fmbXXX, (p, b) -> {
-            p.addAlarm(b.readUnsignedByte() > 0 ? Position.ALARM_GEOFENCE_ENTER : Position.ALARM_GEOFENCE_EXIT);
+        register(254, fmbXXX, (p, b) -> p.set("driverBehaviour", b.readUnsignedByte()));
+        register(389, tmtXXX, (p, b) -> {
+            String x, y;
+            String buttoncombo = ByteBufUtil.hexDump(b.readSlice(1));
+            int button = Integer.parseInt(buttoncombo.substring(0, 1));
+            switch (button) {
+                case 1:
+                    x = "Alarm button";
+                    break;
+                case 2:
+                    x = "Power button";
+                    break;
+                case 3:
+                    x = "Button 1";
+                    break;
+                case 4:
+                    x = "Button 2";
+                    break;
+                case 5:
+                    x = "Button 3";
+                    break;
+                default:
+                    x = "Uknown button";
+                    break;
+            }
+            int action = Integer.parseInt(buttoncombo.substring(1, 2));
+            switch (action) {
+                case 1:
+                    y = "single click";
+                    break;
+                case 2:
+                    y = "double click";
+                    break;
+                case 3:
+                    y = "long click";
+                    break;
+                default:
+                    y = "uknown action";
+                    break;
+            }
+        p.set(Position.KEY_BUTTON_PRESS, x + " " + y);
+        });
+        register(390, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_LEVEL, b.readUnsignedInt() * 0.1));
+        register(390, tmtXXX, (p, b) -> p.set(Position.KEY_STATUS, b.readUnsignedInt()));
+        register(400, tmtXXX, (p, b) -> {
+            switch (b.readUnsignedByte()) {
+                case 0:
+                    p.set(Position.KEY_AMBER_ALERT_STATE, "Off");
+                    break;
+                case 1:
+                    p.set(Position.KEY_AMBER_ALERT_STATE, "Timer On");
+                    p.set(Position.KEY_ALARM, Position.ALARM_AMBER_ON);
+                    break;
+                case 2:
+                    p.set(Position.KEY_AMBER_ALERT_STATE, "Timer Reset");
+                    p.set(Position.KEY_ALARM, Position.ALARM_AMBER_TIMER_RESET);
+                    break;
+                case 3:
+                    p.set(Position.KEY_AMBER_ALERT_STATE, "Timer Exceeded");
+                    p.set(Position.KEY_ALARM, Position.ALARM_AMBER_ALERT);
+                    break;
+                case 4:
+                    p.set(Position.KEY_AMBER_ALERT_STATE, "No Timer");
+                    break;
+                default:
+                    p.set(Position.KEY_AMBER_ALERT_STATE, "N/A");
+                    break;
+            }
         });
         register(636, fmbXXX.or(tatXXX), (p, b) -> p.set("cid4g", b.readUnsignedInt()));
         register(662, fmbXXX, (p, b) -> p.set(Position.KEY_DOOR, b.readUnsignedByte() > 0));

@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "traccar-web",
+			"path": "../traccar-web"
+		}
+	],
+	"settings": {}
+}
