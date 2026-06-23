@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 - 2023 Anton Tananaev (anton@traccar.org)
+ * Copyright 2016 - 2026 Anton Tananaev (anton@traccar.org)
  * Copyright 2016 - 2018 Andrey Kunitsyn (andrey@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,6 +27,7 @@ import org.traccar.model.UserRestrictions;
 import org.traccar.reports.CombinedReportProvider;
 import org.traccar.reports.DevicesReportProvider;
 import org.traccar.reports.EventsReportProvider;
+import org.traccar.reports.GeofenceReportProvider;
 import org.traccar.reports.RouteReportProvider;
 import org.traccar.reports.StopsReportProvider;
 import org.traccar.reports.GeofenceTimeReportProvider;
@@ -35,7 +36,7 @@ import org.traccar.reports.TripsReportProvider;
 import org.traccar.reports.common.ReportExecutor;
 import org.traccar.reports.common.ReportMailer;
 import org.traccar.reports.model.CombinedReportItem;
-import org.traccar.reports.model.GeofenceTimeRecord;
+import org.traccar.reports.model.GeofenceReportItem;
 import org.traccar.reports.model.StopReportItem;
 import org.traccar.reports.model.SummaryReportItem;
 import org.traccar.reports.model.TripReportItem;
@@ -76,6 +77,9 @@ public class ReportResource extends SimpleObjectResource<Report> {
     private EventsReportProvider eventsReportProvider;
 
     @Inject
+    private GeofenceReportProvider geofenceReportProvider;
+
+    @Inject
     private RouteReportProvider routeReportProvider;
 
     @Inject
@@ -100,7 +104,7 @@ public class ReportResource extends SimpleObjectResource<Report> {
     private HttpServletRequest request;
 
     public ReportResource() {
-        super(Report.class, "description");
+        super(Report.class, "description", List.of("description"));
     }
 
     private Response executeReport(long userId, boolean mail, ReportExecutor executor) {
@@ -177,7 +181,7 @@ public class ReportResource extends SimpleObjectResource<Report> {
 
     @Path("route")
     @GET
-    public Collection<Position> getRoute(
+    public Stream<Position> getRoute(
             @QueryParam("deviceId") List<Long> deviceIds,
             @QueryParam("groupId") List<Long> groupIds,
             @QueryParam("from") Date from,
@@ -259,6 +263,19 @@ public class ReportResource extends SimpleObjectResource<Report> {
             @QueryParam("to") Date to,
             @PathParam("type") String type) throws StorageException {
         return getEventsExcel(deviceIds, groupIds, types, alarms, from, to, type.equals("mail"));
+    }
+
+    @Path("geofences")
+    @GET
+    public Collection<GeofenceReportItem> getGeofences(
+            @QueryParam("deviceId") List<Long> deviceIds,
+            @QueryParam("groupId") List<Long> groupIds,
+            @QueryParam("geofenceId") List<Long> geofenceIds,
+            @QueryParam("from") Date from,
+            @QueryParam("to") Date to) throws StorageException {
+        permissionsService.checkRestriction(getUserId(), UserRestrictions::getDisableReports);
+        actionLogger.report(request, getUserId(), false, "geofences", from, to, deviceIds, groupIds);
+        return geofenceReportProvider.getObjects(getUserId(), deviceIds, groupIds, geofenceIds, from, to);
     }
 
     @Path("summary")
