@@ -1,0 +1,9 @@
+#set($subject = "Test Notification")
+#set($digest = "Test Notification")
+<!DOCTYPE html>
+<html>
+<body>
+Test Notification<br>
+Time: $dateTool.format('yyyy-MM-dd HH:mm:ss', $event.eventTime, $locale, $timezone)<br>
+</body>
+</html>

@@ -4,5 +4,6 @@
 <html>
 <body>
 Your device $esc.html($device.name) will expire on $dateTool.format('yyyy-MM-dd', $expiration, $locale, $timezone).
+To continue use of your device without interuption please purchase a service package or sign up for a direct debit here https://location-services.complexus.uk/product/service-package/
 </body>
 </html>

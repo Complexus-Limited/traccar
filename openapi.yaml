@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Traccar
-  description: Traccar GPS tracking server API documentation. To use the API you need to have a server instance. For testing purposes you can use one of free [demo servers](https://www.traccar.org/demo-server/). For production use you can install your own server or get a [subscription service](https://www.traccar.org/product/tracking-server/).
+  description: API documentation https://tracking.complexus.uk.
   contact:
     name: Traccar Support
     url: https://www.traccar.org/
@@ -11,16 +11,10 @@ info:
     url: https://www.apache.org/licenses/LICENSE-2.0.html
   version: '6.15.3'
 servers:
-  - url: https://demo.traccar.org/api
-    description: Demo Server 1
-  - url: https://demo2.traccar.org/api
-    description: Demo Server 2
-  - url: https://demo3.traccar.org/api
-    description: Demo Server 3
-  - url: https://demo4.traccar.org/api
-    description: Demo Server 4
-  - url: https://server.traccar.org/api
-    description: Subscription Server
+  - url: https://tracking.complexus.uk/api
+    description: Production Server
+  - url: https://dev.complexus.uk/api
+    description: Devleopment Server
   - url: http://{host}:{port}/api
     description: Other Server
     variables:

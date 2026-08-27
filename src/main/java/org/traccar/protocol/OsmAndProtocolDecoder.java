@@ -157,6 +157,10 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
                     case "batt" -> position.set(Position.KEY_BATTERY_LEVEL, Double.parseDouble(value));
                     case "driverUniqueId" -> position.set(Position.KEY_DRIVER_UNIQUE_ID, value);
                     case "charge" -> position.set(Position.KEY_CHARGE, Boolean.parseBoolean(value));
+                    case "sos" -> position.set(Position.KEY_ALARM, Position.ALARM_SOS);
+                    case "lowbattery" -> position.set(Position.KEY_ALARM, Position.ALARM_LOW_BATTERY);
+                    case "event" -> position.set(Position.KEY_EVENT, value);
+                    case "temperature" -> position.set(Position.KEY_DEVICE_TEMP, Double.parseDouble(value));
                     default -> {
                         try {
                             position.set(entry.getKey(), Double.parseDouble(value));
