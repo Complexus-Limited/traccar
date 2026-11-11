@@ -19,19 +19,19 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
-import org.traccar.helper.StringUtil;
-import org.traccar.session.DeviceSession;
 import org.traccar.NetworkMessage;
 import org.traccar.Protocol;
 import org.traccar.helper.BitUtil;
 import org.traccar.helper.BufferUtil;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
+import org.traccar.helper.StringUtil;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.model.CellTower;
 import org.traccar.model.Network;
 import org.traccar.model.Position;
 import org.traccar.model.WifiAccessPoint;
+import org.traccar.session.DeviceSession;
 
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -39,8 +39,6 @@ import java.util.Date;
 import java.util.regex.Pattern;
 
 public class WatchProtocolDecoder extends BaseProtocolDecoder {
-
-    private ByteBuf audio;
 
     public WatchProtocolDecoder(Protocol protocol) {
         super(protocol);
@@ -256,8 +254,14 @@ public class WatchProtocolDecoder extends BaseProtocolDecoder {
 
                     getLastLocation(position, null);
 
-                    position.set(Position.KEY_BATTERY_LEVEL, Integer.parseInt(values[2]));
-                    position.set(Position.KEY_STEPS, Integer.parseInt(values[0]));
+                    int steps = Integer.parseInt(values[0]);
+                    int rolling = Integer.parseInt(values[1]);
+                    int battery = Integer.parseInt(values[2]);
+                    if ("SG".equals(manufacturer) && steps == 0 && battery == 0 && rolling > 0 && rolling <= 100) {
+                        battery = rolling;
+                    }
+                    position.set(Position.KEY_BATTERY_LEVEL, battery);
+                    position.set(Position.KEY_STEPS, steps);
 
                     return position;
                 }
@@ -342,10 +346,10 @@ public class WatchProtocolDecoder extends BaseProtocolDecoder {
             int current = Integer.parseInt(values[2]);
             int total = Integer.parseInt(values[3]);
 
-            if (audio == null) {
-                audio = Unpooled.buffer();
+            if (getMediaBuffer() == null) {
+                newMediaBuffer();
             }
-            audio.writeBytes(buf);
+            getMediaBuffer().writeBytes(buf);
 
             sendResponse(channel, id, index, "JXTKR,1");
 
@@ -355,13 +359,11 @@ public class WatchProtocolDecoder extends BaseProtocolDecoder {
                 Position position = new Position(getProtocolName());
                 position.setDeviceId(deviceSession.getDeviceId());
                 getLastLocation(position, null);
-                position.set(Position.KEY_AUDIO, writeMediaFile(id, audio, "amr"));
-                audio.release();
-                audio = null;
+                position.set(Position.KEY_AUDIO, writeMediaFile(id, "amr"));
                 return position;
             }
 
-        } else if (type.equals("TK")) {
+        } else if (type.equals("TK") || type.equals("TK2")) {
 
             if (buf.readableBytes() == 1) {
                 return null;

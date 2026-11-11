@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 - 2025 Anton Tananaev (anton@traccar.org)
+ * Copyright 2022 - 2026 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,21 +15,24 @@
  */
 package org.traccar.session.cache;
 
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.traccar.broadcast.BroadcastInterface;
 import org.traccar.broadcast.BroadcastService;
 import org.traccar.config.Config;
+import org.traccar.config.Keys;
+import org.traccar.helper.model.AttributeUtil;
+import org.traccar.helper.model.PositionUtil;
 import org.traccar.model.Attribute;
 import org.traccar.model.BaseModel;
 import org.traccar.model.Calendar;
+import org.traccar.model.CompactPosition;
 import org.traccar.model.Device;
 import org.traccar.model.Driver;
 import org.traccar.model.Geofence;
 import org.traccar.model.Group;
 import org.traccar.model.GroupedModel;
+import org.traccar.model.LinkedDevice;
 import org.traccar.model.Maintenance;
 import org.traccar.model.Notification;
 import org.traccar.model.ObjectOperation;
@@ -44,10 +47,16 @@ import org.traccar.storage.query.Columns;
 import org.traccar.storage.query.Condition;
 import org.traccar.storage.query.Request;
 
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import java.util.Date;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -57,7 +66,7 @@ public class CacheManager implements BroadcastInterface {
     private static final Logger LOGGER = LoggerFactory.getLogger(CacheManager.class);
 
     private static final Set<Class<? extends BaseModel>> GROUPED_CLASSES =
-            Set.of(Attribute.class, Driver.class, Geofence.class, Maintenance.class, Notification.class);
+            Set.of(Attribute.class, Device.class, Driver.class, Geofence.class, Maintenance.class, Notification.class);
 
     private final Config config;
     private final Storage storage;
@@ -65,8 +74,13 @@ public class CacheManager implements BroadcastInterface {
 
     private final CacheGraph graph = new CacheGraph();
 
+    private static final class PositionHistory {
+        private volatile Position latest;
+        private final Deque<CompactPosition> positions = new ConcurrentLinkedDeque<>();
+    }
+
     private volatile Server server;
-    private final Map<Long, Position> devicePositions = new ConcurrentHashMap<>();
+    private final Map<Long, PositionHistory> devicePositions = new ConcurrentHashMap<>();
     private final Map<Long, HashSet<Object>> deviceReferences = new ConcurrentHashMap<>();
 
     @Inject
@@ -97,7 +111,12 @@ public class CacheManager implements BroadcastInterface {
     }
 
     public Position getPosition(long deviceId) {
-        return devicePositions.get(deviceId);
+        var history = devicePositions.get(deviceId);
+        return history != null ? history.latest : null;
+    }
+
+    public Deque<CompactPosition> getPositions(long deviceId) {
+        return devicePositions.computeIfAbsent(deviceId, k -> new PositionHistory()).positions;
     }
 
     public Server getServer() {
@@ -120,6 +139,16 @@ public class CacheManager implements BroadcastInterface {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    public <T> T withDevice(long deviceId, Callable<T> action) throws Exception {
+        var key = new Object();
+        try {
+            addDevice(deviceId, key);
+            return action.call();
+        } finally {
+            removeDevice(deviceId, key);
+        }
+    }
+
     public synchronized void addDevice(long deviceId, Object key) throws Exception {
         var references = deviceReferences.computeIfAbsent(deviceId, k -> new HashSet<>());
         if (references.isEmpty()) {
@@ -129,9 +158,23 @@ public class CacheManager implements BroadcastInterface {
             initializeCache(device);
             if (device.getPositionId() > 0) {
                 Position position = storage.getObject(Position.class, new Request(
-                        new Columns.All(), new Condition.Equals("id", device.getPositionId())));
+                        new Columns.All(),
+                        new Condition.And(
+                                new Condition.Equals("deviceId", deviceId),
+                                new Condition.Equals("id", device.getPositionId()))));
                 if (position != null) {
-                    devicePositions.put(deviceId, position);
+                    var history = devicePositions.computeIfAbsent(deviceId, k -> new PositionHistory());
+                    if (config.getBoolean(Keys.REPORT_TRIP_NEW_LOGIC)) {
+                        long minDuration = AttributeUtil.lookup(this, Keys.REPORT_TRIP_MIN_DURATION, deviceId) * 1000;
+                        var from = new Date(position.getFixTime().getTime() - minDuration);
+                        var to = position.getFixTime();
+                        try (var positionsStream =
+                                PositionUtil.getPositionsStreamWithExtra(storage, deviceId, from, to)) {
+                            positionsStream.forEach(loaded -> appendPosition(history, loaded));
+                        }
+                    } else {
+                        appendPosition(history, position);
+                    }
                 }
             }
         }
@@ -143,6 +186,7 @@ public class CacheManager implements BroadcastInterface {
         var references = deviceReferences.computeIfAbsent(deviceId, k -> new HashSet<>());
         references.remove(key);
         if (references.isEmpty()) {
+            removeLinkedDevices(deviceId);
             graph.removeObject(Device.class, deviceId);
             devicePositions.remove(deviceId);
             deviceReferences.remove(deviceId);
@@ -150,9 +194,55 @@ public class CacheManager implements BroadcastInterface {
         LOGGER.debug("Cache remove device {} references {} key {}", deviceId, references.size(), key);
     }
 
+    private void removeLinkedDevices(long deviceId) {
+        for (Device linkedDevice : getDeviceObjects(deviceId, Device.class)) {
+            removeDevice(linkedDevice.getId(), deviceId);
+        }
+    }
+
+    private static boolean appendPosition(PositionHistory history, Position position) {
+        Position previous = history.latest;
+        if (previous != null) {
+            if (position.getFixTime().before(previous.getFixTime())) {
+                return false;
+            }
+            if (position.getFixTime().equals(previous.getFixTime())) {
+                if (position.getServerTime().before(previous.getServerTime())) {
+                    return false;
+                }
+                history.positions.pollLast();
+            }
+        }
+        history.positions.add(new CompactPosition(position));
+        history.latest = position;
+        return true;
+    }
+
     public void updatePosition(Position position) {
         deviceReferences.computeIfPresent(position.getDeviceId(), (key, oldValue) -> {
-            devicePositions.put(key, position);
+            var history = devicePositions.computeIfAbsent(key, k -> new PositionHistory());
+            if (!appendPosition(history, position)) {
+                return oldValue;
+            }
+            var positions = history.positions;
+            if (config.getBoolean(Keys.REPORT_TRIP_NEW_LOGIC)) {
+                long minDuration = AttributeUtil.lookup(
+                        this, Keys.REPORT_TRIP_MIN_DURATION, key) * 1000;
+                long lastTime = position.getFixTime().getTime();
+                var iterator = positions.iterator();
+                iterator.next();
+                int toPrune = 0;
+                while (iterator.hasNext() && lastTime - iterator.next().fixTime().getTime() >= minDuration) {
+                    toPrune += 1;
+                }
+                while (toPrune-- > 0) {
+                    positions.poll();
+                }
+            } else {
+                while (positions.size() > 1) {
+                    positions.poll();
+                }
+            }
             return oldValue;
         });
     }
@@ -166,6 +256,13 @@ public class CacheManager implements BroadcastInterface {
 
         synchronized (this) {
             if (operation == ObjectOperation.DELETE) {
+                if (clazz.equals(Device.class)) {
+                    var references = deviceReferences.get(id);
+                    if (references != null && !references.isEmpty()) {
+                        return;
+                    }
+                    removeLinkedDevices(id);
+                }
                 graph.removeObject(clazz, id);
             }
             if (operation != ObjectOperation.UPDATE) {
@@ -187,9 +284,9 @@ public class CacheManager implements BroadcastInterface {
                 return;
             }
 
-            if (after instanceof GroupedModel) {
+            if (after instanceof GroupedModel afterGrouped) {
                 long beforeGroupId = ((GroupedModel) before).getGroupId();
-                long afterGroupId = ((GroupedModel) after).getGroupId();
+                long afterGroupId = afterGrouped.getGroupId();
                 if (beforeGroupId != afterGroupId) {
                     if (beforeGroupId > 0) {
                         invalidatePermission(clazz, id, Group.class, beforeGroupId, false);
@@ -198,9 +295,10 @@ public class CacheManager implements BroadcastInterface {
                         invalidatePermission(clazz, id, Group.class, afterGroupId, true);
                     }
                 }
-            } else if (after instanceof Schedulable) {
+            }
+            if (after instanceof Schedulable afterSchedulable) {
                 long beforeCalendarId = ((Schedulable) before).getCalendarId();
-                long afterCalendarId = ((Schedulable) after).getCalendarId();
+                long afterCalendarId = afterSchedulable.getCalendarId();
                 if (beforeCalendarId != afterCalendarId) {
                     if (beforeCalendarId > 0) {
                         invalidatePermission(clazz, id, Calendar.class, beforeCalendarId, false);
@@ -209,7 +307,6 @@ public class CacheManager implements BroadcastInterface {
                         invalidatePermission(clazz, id, Calendar.class, afterCalendarId, true);
                     }
                 }
-                // TODO handle notification always change
             }
 
             graph.updateObject(after);
@@ -232,8 +329,13 @@ public class CacheManager implements BroadcastInterface {
         }
     }
 
-    private <T1 extends BaseModel, T2 extends BaseModel> void invalidatePermission(
-            Class<T1> fromClass, long fromId, Class<T2> toClass, long toId, boolean link) throws Exception {
+    private void invalidatePermission(
+            Class<? extends BaseModel> fromClass, long fromId,
+            Class<? extends BaseModel> toClass, long toId, boolean link) throws Exception {
+
+        if (toClass.equals(LinkedDevice.class)) {
+            toClass = Device.class;
+        }
 
         boolean groupLink = GroupedModel.class.isAssignableFrom(fromClass) && toClass.equals(Group.class);
         boolean calendarLink = Schedulable.class.isAssignableFrom(fromClass) && toClass.equals(Calendar.class);
@@ -246,23 +348,29 @@ public class CacheManager implements BroadcastInterface {
             return;
         }
 
+        boolean cachedDeviceLink = fromClass.equals(Device.class) && toClass.equals(Device.class)
+                && graph.getObject(fromClass, fromId) != null;
         if (link) {
+            if (cachedDeviceLink) {
+                addDevice(toId, fromId);
+            }
             if (!graph.addLink(fromClass, fromId, toClass, toId, createObjectSupplier(toClass, toId))) {
                 initializeCache(graph.getObject(toClass, toId));
             }
         } else {
             graph.removeLink(fromClass, fromId, toClass, toId);
+            if (cachedDeviceLink) {
+                removeDevice(toId, fromId);
+            }
         }
     }
 
     private void initializeCache(BaseModel object) throws Exception {
         if (object instanceof User) {
-            for (Permission permission : storage.getPermissions(User.class, Notification.class)) {
-                if (permission.getOwnerId() == object.getId()) {
-                    invalidatePermission(
-                            permission.getOwnerClass(), permission.getOwnerId(),
-                            permission.getPropertyClass(), permission.getPropertyId(), true);
-                }
+            for (Permission permission : storage.getPermissions(User.class, object.getId(), Notification.class, 0)) {
+                invalidatePermission(
+                        permission.getOwnerClass(), permission.getOwnerId(),
+                        permission.getPropertyClass(), permission.getPropertyId(), true);
             }
         } else {
             if (object instanceof GroupedModel groupedModel) {
@@ -271,18 +379,18 @@ public class CacheManager implements BroadcastInterface {
                     invalidatePermission(object.getClass(), object.getId(), Group.class, groupId, true);
                 }
 
-                for (Permission permission : storage.getPermissions(User.class, object.getClass())) {
-                    if (permission.getPropertyId() == object.getId()) {
-                        invalidatePermission(
-                                object.getClass(), object.getId(), User.class, permission.getOwnerId(), true);
-                    }
+                for (Permission permission : storage.getPermissions(User.class, 0, object.getClass(), object.getId())) {
+                    invalidatePermission(
+                            object.getClass(), object.getId(), User.class, permission.getOwnerId(), true);
                 }
 
                 for (Class<? extends BaseModel> clazz : GROUPED_CLASSES) {
-                    for (Permission permission : storage.getPermissions(object.getClass(), clazz)) {
-                        if (permission.getOwnerId() == object.getId()) {
+                    if (!clazz.equals(Device.class) || object.getClass().equals(Device.class)) {
+                        for (Permission permission : storage.getPermissions(
+                                object.getClass(), object.getId(), clazz, 0)) {
                             invalidatePermission(
-                                    object.getClass(), object.getId(), clazz, permission.getPropertyId(), true);
+                                    object.getClass(), object.getId(),
+                                    clazz, permission.getPropertyId(), true);
                         }
                     }
                 }

@@ -26,13 +26,13 @@ import io.netty.handler.codec.http.HttpVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.traccar.BaseProtocolDecoder;
-import org.traccar.session.DeviceSession;
 import org.traccar.NetworkMessage;
 import org.traccar.Protocol;
 import org.traccar.helper.BitUtil;
 import org.traccar.helper.DateBuilder;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.model.Position;
+import org.traccar.session.DeviceSession;
 
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -236,7 +236,7 @@ public class Mta6ProtocolDecoder extends BaseProtocolDecoder {
         }
 
         if (BitUtil.check(flags, 3)) {
-            position.set(Position.KEY_FUEL_LEVEL, buf.readUnsignedShort());
+            position.set(Position.KEY_FUEL, buf.readUnsignedShort());
             position.set(Position.PREFIX_ADC + 2, buf.readUnsignedShort());
             position.set(Position.PREFIX_ADC + 3, buf.readUnsignedShort());
             position.set(Position.PREFIX_ADC + 4, buf.readUnsignedShort());

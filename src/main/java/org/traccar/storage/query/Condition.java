@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 - 2025 Anton Tananaev (anton@traccar.org)
+ * Copyright 2022 - 2026 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -174,15 +174,40 @@ public interface Condition {
         }
     }
 
+    class Contains implements Condition {
+        private final List<String> columns;
+        private final String value;
+
+        public Contains(List<String> columns, String value) {
+            this.columns = columns;
+            this.value = value;
+        }
+
+        public List<String> getColumns() {
+            return columns;
+        }
+
+        public String getValue() {
+            return value;
+        }
+    }
+
     class LatestPositions implements Condition {
+        private final Condition condition;
         private final long deviceId;
 
+        public LatestPositions(Condition condition) {
+            this.condition = condition;
+            this.deviceId = 0;
+        }
+
         public LatestPositions(long deviceId) {
+            this.condition = new Equals("id", deviceId);
             this.deviceId = deviceId;
         }
 
-        public LatestPositions() {
-            this(0);
+        public Condition getCondition() {
+            return condition;
         }
 
         public long getDeviceId() {

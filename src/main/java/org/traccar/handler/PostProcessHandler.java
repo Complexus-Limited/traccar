@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2024 - 2026 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,45 +15,39 @@
  */
 package org.traccar.handler;
 
-import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.traccar.helper.model.PositionUtil;
-import org.traccar.model.Device;
+import org.traccar.database.DeviceUpdateManager;
 import org.traccar.model.Position;
 import org.traccar.session.ConnectionManager;
 import org.traccar.session.cache.CacheManager;
-import org.traccar.storage.Storage;
 import org.traccar.storage.StorageException;
-import org.traccar.storage.query.Columns;
-import org.traccar.storage.query.Condition;
-import org.traccar.storage.query.Request;
+
+import jakarta.inject.Inject;
+import java.util.Map;
 
 public class PostProcessHandler extends BasePositionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PostProcessHandler.class);
 
     private final CacheManager cacheManager;
-    private final Storage storage;
+    private final DeviceUpdateManager deviceUpdateManager;
     private final ConnectionManager connectionManager;
 
     @Inject
-    public PostProcessHandler(CacheManager cacheManager, Storage storage, ConnectionManager connectionManager) {
+    public PostProcessHandler(
+            CacheManager cacheManager, DeviceUpdateManager deviceUpdateManager, ConnectionManager connectionManager) {
         this.cacheManager = cacheManager;
-        this.storage = storage;
+        this.deviceUpdateManager = deviceUpdateManager;
         this.connectionManager = connectionManager;
     }
 
     @Override
     public void onPosition(Position position, Callback callback) {
         try {
-            if (PositionUtil.isLatest(cacheManager, position)) {
-                Device updatedDevice = new Device();
-                updatedDevice.setId(position.getDeviceId());
-                updatedDevice.setPositionId(position.getId());
-                storage.updateObject(updatedDevice, new Request(
-                        new Columns.Include("positionId"),
-                        new Condition.Equals("id", updatedDevice.getId())));
+            Position lastPosition = cacheManager.getPosition(position.getDeviceId());
+            if (lastPosition == null || !position.getFixTime().before(lastPosition.getFixTime())) {
+                deviceUpdateManager.update(position.getDeviceId(), Map.of("positionId", position.getId()));
 
                 cacheManager.updatePosition(position);
                 connectionManager.updatePosition(true, position);

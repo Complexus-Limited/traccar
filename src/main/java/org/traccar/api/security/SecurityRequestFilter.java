@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2015 - 2025 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,9 @@
  */
 package org.traccar.api.security;
 
-import com.google.inject.Injector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.traccar.database.StatisticsManager;
-import org.traccar.helper.SessionHelper;
 import org.traccar.model.User;
 import org.traccar.storage.StorageException;
 
@@ -36,7 +34,6 @@ import jakarta.ws.rs.core.SecurityContext;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.security.GeneralSecurityException;
-import java.util.Date;
 
 public class SecurityRequestFilter implements ContainerRequestFilter {
 
@@ -53,9 +50,6 @@ public class SecurityRequestFilter implements ContainerRequestFilter {
 
     @Inject
     private StatisticsManager statisticsManager;
-
-    @Inject
-    private Injector injector;
 
     @Override
     public void filter(ContainerRequestContext requestContext) {
@@ -74,7 +68,7 @@ public class SecurityRequestFilter implements ContainerRequestFilter {
                 try {
                     String[] auth = authHeader.split(" ");
                     LoginResult loginResult = loginService.login(auth[0], auth[1]);
-                    if (loginResult != null) {
+                    if (loginResult != null && loginResult.getUser() != null) {
                         User user = loginResult.getUser();
                         statisticsManager.registerRequest(user.getId());
                         securityContext = new UserSecurityContext(
@@ -84,17 +78,14 @@ public class SecurityRequestFilter implements ContainerRequestFilter {
                     throw new WebApplicationException(e);
                 }
 
-            } else if (request.getSession() != null) {
+            } else {
 
-                Long userId = (Long) request.getSession().getAttribute(SessionHelper.USER_ID_KEY);
-                Date expiration = (Date) request.getSession().getAttribute(SessionHelper.EXPIRATION_KEY);
-                if (userId != null) {
-                    User user = injector.getInstance(PermissionsService.class).getUser(userId);
-                    if (user != null) {
-                        user.checkDisabled();
-                        statisticsManager.registerRequest(userId);
-                        securityContext = new UserSecurityContext(new UserPrincipal(userId, expiration));
-                    }
+                LoginResult loginResult = loginService.login(request);
+                if (loginResult != null && loginResult.getUser() != null) {
+                    User user = loginResult.getUser();
+                    statisticsManager.registerRequest(user.getId());
+                    securityContext = new UserSecurityContext(
+                            new UserPrincipal(user.getId(), loginResult.getExpiration()));
                 }
 
             }

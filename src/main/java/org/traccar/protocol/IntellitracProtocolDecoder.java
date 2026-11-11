@@ -17,12 +17,12 @@ package org.traccar.protocol;
 
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
-import org.traccar.session.DeviceSession;
 import org.traccar.Protocol;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.model.Position;
+import org.traccar.session.DeviceSession;
 
 import java.net.SocketAddress;
 import java.util.regex.Pattern;
@@ -122,7 +122,7 @@ public class IntellitracProtocolDecoder extends BaseProtocolDecoder {
             position.set(Position.KEY_OBD_SPEED, parser.nextInt());
             position.set(Position.KEY_RPM, parser.nextInt());
             position.set("coolant", parser.nextInt());
-            position.set(Position.KEY_FUEL_LEVEL, parser.nextInt());
+            position.set(Position.KEY_FUEL, parser.nextInt());
             position.set(Position.KEY_FUEL_CONSUMPTION, parser.nextInt());
             position.set(Position.PREFIX_TEMP + 1, parser.nextInt());
             position.set("chargerPressure", parser.nextInt());

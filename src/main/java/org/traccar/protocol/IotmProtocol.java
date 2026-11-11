@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Anton Tananaev (anton@traccar.org)
+ * Copyright 2020 - 2025 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import org.traccar.BaseProtocol;
 import org.traccar.PipelineBuilder;
 import org.traccar.TrackerServer;
 import org.traccar.config.Config;
+import org.traccar.model.Command;
 
 import jakarta.inject.Inject;
 
@@ -28,11 +29,14 @@ public class IotmProtocol extends BaseProtocol {
 
     @Inject
     public IotmProtocol(Config config) {
+        setSupportedDataCommands(
+                Command.TYPE_OUTPUT_CONTROL);
         addServer(new TrackerServer(config, getName(), false) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {
                 pipeline.addLast(MqttEncoder.INSTANCE);
                 pipeline.addLast(new MqttDecoder());
+                pipeline.addLast(new IotmProtocolEncoder(IotmProtocol.this));
                 pipeline.addLast(new IotmProtocolDecoder(IotmProtocol.this));
             }
         });

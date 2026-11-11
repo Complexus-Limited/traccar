@@ -9,6 +9,7 @@ import org.traccar.config.Config;
 import org.traccar.config.Keys;
 import org.traccar.helper.model.PositionUtil;
 import org.traccar.model.Device;
+import org.traccar.model.Event;
 import org.traccar.model.Position;
 import org.traccar.reports.common.ReportUtils;
 import org.traccar.reports.model.StopReportItem;
@@ -85,22 +86,92 @@ public class ReportUtilsTest extends BaseTest {
         startPosition.set(Position.KEY_TOTAL_DISTANCE, 500.0);
         Position endPosition = new Position();
         endPosition.set(Position.KEY_TOTAL_DISTANCE, 700.0);
-        assertEquals(PositionUtil.calculateDistance(startPosition, endPosition, true), 200.0, 10);
+        assertEquals(200.0, PositionUtil.calculateDistance(startPosition, endPosition, true), 10);
         startPosition.set(Position.KEY_ODOMETER, 50000);
         endPosition.set(Position.KEY_ODOMETER, 51000);
-        assertEquals(PositionUtil.calculateDistance(startPosition, endPosition, true), 1000.0, 10);
+        assertEquals(1000.0, PositionUtil.calculateDistance(startPosition, endPosition, true), 10);
     }
 
     @Test
-    public void testCalculateSpentFuel() {
+    public void testCalculateSpentFuelWithNoFuelData() {
         ReportUtils reportUtils = new ReportUtils(
                 mock(Config.class), storage, mock(PermissionsService.class), mock(VelocityEngine.class), null);
+        Device device = mock(Device.class);
         Position startPosition = new Position();
         Position endPosition = new Position();
-        assertEquals(reportUtils.calculateFuel(startPosition, endPosition), 0.0, 0.01);
-        startPosition.set(Position.KEY_FUEL_LEVEL, 0.7);
-        endPosition.set(Position.KEY_FUEL_LEVEL, 0.5);
-        assertEquals(reportUtils.calculateFuel(startPosition, endPosition), 0.2, 0.01);
+
+        assertEquals(0.0, reportUtils.calculateFuel(startPosition, endPosition, device, List.of()), 0.01);
+    }
+
+    @Test
+    public void testCalculateSpentFuelWithFuel() {
+        ReportUtils reportUtils = new ReportUtils(
+                mock(Config.class), storage, mock(PermissionsService.class), mock(VelocityEngine.class), null);
+        Device device = mock(Device.class);
+        Position startPosition = new Position();
+        Position endPosition = new Position();
+
+        startPosition.set(Position.KEY_FUEL, 0.7);
+        endPosition.set(Position.KEY_FUEL, 0.5);
+        assertEquals(0.2, reportUtils.calculateFuel(startPosition, endPosition, device, List.of()), 0.01);
+    }
+
+    @Test
+    public void testCalculateSpentFuelWithFuelUsed() {
+        ReportUtils reportUtils = new ReportUtils(
+                mock(Config.class), storage, mock(PermissionsService.class), mock(VelocityEngine.class), null);
+        Device device = mock(Device.class);
+        Position startPosition = new Position();
+        Position endPosition = new Position();
+
+        startPosition.set(Position.KEY_FUEL_USED, 10.0);
+        endPosition.set(Position.KEY_FUEL_USED, 15.0);
+        assertEquals(5.0, reportUtils.calculateFuel(startPosition, endPosition, device, List.of()), 0.01);
+    }
+
+    @Test
+    public void testCalculateSpentFuelWithFuelLevel() {
+        ReportUtils reportUtils = new ReportUtils(
+                mock(Config.class), storage, mock(PermissionsService.class), mock(VelocityEngine.class), null);
+        Device deviceWithCapacity = mock(Device.class);
+        when(deviceWithCapacity.hasAttribute(Keys.FUEL_CAPACITY.getKey())).thenReturn(true);
+        when(deviceWithCapacity.getDouble(Keys.FUEL_CAPACITY.getKey())).thenReturn(100.0);
+
+        Position startPosition = new Position();
+        Position endPosition = new Position();
+
+        startPosition.set(Position.KEY_FUEL_LEVEL, 80.0);
+        endPosition.set(Position.KEY_FUEL_LEVEL, 60.0);
+        assertEquals(20.0,
+                reportUtils.calculateFuel(startPosition, endPosition, deviceWithCapacity, List.of()), 0.01);
+    }
+
+    @Test
+    public void testCalculateSpentFuelExcludesFillingsAndDrains() throws Exception {
+        ReportUtils reportUtils = new ReportUtils(
+                mock(Config.class), storage, mock(PermissionsService.class), mock(VelocityEngine.class), null);
+        Device device = mock(Device.class);
+
+        Position startPosition = new Position();
+        startPosition.setTime(date("2016-01-01 00:00:00.000"));
+        startPosition.set(Position.KEY_FUEL, 50.0);
+
+        Position endPosition = new Position();
+        endPosition.setTime(date("2016-01-01 01:00:00.000"));
+        endPosition.set(Position.KEY_FUEL, 50.0);
+
+        Event drop = new Event(Event.TYPE_DEVICE_FUEL_DROP, 1);
+        drop.setEventTime(date("2016-01-01 00:20:00.000"));
+        drop.set("before", 50.0);
+        drop.set("after", 30.0);
+
+        Event increase = new Event(Event.TYPE_DEVICE_FUEL_INCREASE, 1);
+        increase.setEventTime(date("2016-01-01 00:40:00.000"));
+        increase.set("before", 30.0);
+        increase.set("after", 55.0);
+
+        assertEquals(5.0,
+                reportUtils.calculateFuel(startPosition, endPosition, device, List.of(drop, increase)), 0.01);
     }
 
     @Test
@@ -287,18 +358,18 @@ public class ReportUtilsTest extends BaseTest {
     @Test
     public void testDetectStopsWithFluctuation() throws Exception {
         Stream<Position> data = Stream.of(
-            position(1, "2016-01-01 00:00:00.000", 0, 0),
-            position(2, "2016-01-01 00:01:00.000", 0, 0),
-            position(3, "2016-01-01 00:02:00.000", 10, 0),
-            position(4, "2016-01-01 00:03:00.000", 10, 1000),
-            position(5, "2016-01-01 00:04:00.000", 10, 2000),
-            position(6, "2016-01-01 00:05:00.000", 10, 3000),
-            position(7, "2016-01-01 00:06:00.000", 10, 4000),
-            position(8, "2016-01-01 00:07:00.000", 0, 5000),
-            position(9, "2016-01-01 00:08:00.000", 10, 6000),
-            position(10, "2016-01-01 00:09:00.000", 0, 7000),
-            position(11, "2016-01-01 00:19:00.000", 0, 7000),
-            position(12, "2016-01-01 00:29:00.000", 0, 7000));
+                position(1, "2016-01-01 00:00:00.000", 0, 0),
+                position(2, "2016-01-01 00:01:00.000", 0, 0),
+                position(3, "2016-01-01 00:02:00.000", 10, 0),
+                position(4, "2016-01-01 00:03:00.000", 10, 1000),
+                position(5, "2016-01-01 00:04:00.000", 10, 2000),
+                position(6, "2016-01-01 00:05:00.000", 10, 3000),
+                position(7, "2016-01-01 00:06:00.000", 10, 4000),
+                position(8, "2016-01-01 00:07:00.000", 0, 5000),
+                position(9, "2016-01-01 00:08:00.000", 10, 6000),
+                position(10, "2016-01-01 00:09:00.000", 0, 7000),
+                position(11, "2016-01-01 00:19:00.000", 0, 7000),
+                position(12, "2016-01-01 00:29:00.000", 0, 7000));
         when(storage.getObjectsStream(eq(Position.class), any())).thenReturn(data);
         Device device = mockDevice(500, 300, 180, 900, false);
         ReportUtils reportUtils = new ReportUtils(
@@ -493,6 +564,37 @@ public class ReportUtilsTest extends BaseTest {
         assertEquals(date("2016-01-01 00:04:00.000"), itemStop.getStartTime());
         assertEquals(date("2016-01-01 00:25:00.000"), itemStop.getEndTime());
         assertEquals(1260000, itemStop.getDuration());
+    }
+
+    @Test
+    public void testDetectTripsWithNewLogicIgnition() throws Exception {
+
+        List<Position> data = Arrays.asList(
+                position(1, "2016-01-01 00:00:00.000", 0, 0),
+                position(2, "2016-01-01 00:01:00.000", 0, 0),
+                position(3, "2016-01-01 00:02:00.000", 0, 0));
+        when(storage.getObjectsStream(eq(Position.class), any())).thenReturn(data.stream());
+
+        data.get(0).set(Position.KEY_IGNITION, true);
+        data.get(1).set(Position.KEY_IGNITION, true);
+        data.get(2).set(Position.KEY_IGNITION, false);
+
+        Config config = mock(Config.class);
+        when(config.getBoolean(Keys.REPORT_TRIP_NEW_LOGIC)).thenReturn(true);
+        Device device = mockDevice(500, 300, 180, 900, true);
+        ReportUtils reportUtils = new ReportUtils(
+                config, storage, mock(PermissionsService.class), mock(VelocityEngine.class), null);
+
+        var trips = reportUtils.slowTripsAndStops(device, new Date(), new Date(), TripReportItem.class);
+
+        assertNotNull(trips);
+        assertFalse(trips.isEmpty());
+
+        TripReportItem itemTrip = trips.iterator().next();
+
+        assertEquals(date("2016-01-01 00:00:00.000"), itemTrip.getStartTime());
+        assertEquals(date("2016-01-01 00:02:00.000"), itemTrip.getEndTime());
+        assertEquals(120000, itemTrip.getDuration());
     }
 
 }

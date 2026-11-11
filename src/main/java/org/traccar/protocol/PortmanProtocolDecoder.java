@@ -17,12 +17,12 @@ package org.traccar.protocol;
 
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
-import org.traccar.session.DeviceSession;
 import org.traccar.Protocol;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.model.Position;
+import org.traccar.session.DeviceSession;
 
 import java.net.SocketAddress;
 import java.util.regex.Pattern;
@@ -91,7 +91,7 @@ public class PortmanProtocolDecoder extends BaseProtocolDecoder {
         position.set(Position.PREFIX_TEMP + 1, parser.next());
         position.set(Position.KEY_STATUS, parser.nextHexLong());
         if (parser.hasNext()) {
-            position.set(Position.KEY_FUEL_LEVEL, parser.nextInt() * 0.1);
+            position.set(Position.KEY_FUEL, parser.nextInt() / 10.0);
         }
         position.set(Position.KEY_DRIVER_UNIQUE_ID, parser.next());
 
@@ -106,7 +106,7 @@ public class PortmanProtocolDecoder extends BaseProtocolDecoder {
         position.set(Position.KEY_SATELLITES, parser.nextInt());
         position.set(Position.KEY_ODOMETER, parser.nextDouble() * 1000);
         position.set(Position.KEY_RSSI, parser.nextInt());
-        position.set(Position.KEY_FUEL_LEVEL, parser.nextInt());
+        position.set(Position.KEY_FUEL, parser.nextInt());
 
         return position;
     }
@@ -157,7 +157,7 @@ public class PortmanProtocolDecoder extends BaseProtocolDecoder {
         position.setCourse(parser.nextInt());
 
         position.set(Position.PREFIX_TEMP + 1, parser.next());
-        position.set(Position.KEY_FUEL_LEVEL, parser.nextInt());
+        position.set(Position.KEY_FUEL, parser.nextInt());
         position.set(Position.KEY_SATELLITES, parser.nextInt());
         position.set(Position.KEY_RSSI, parser.nextInt());
         position.set(Position.KEY_ODOMETER, parser.nextDouble() * 1000);

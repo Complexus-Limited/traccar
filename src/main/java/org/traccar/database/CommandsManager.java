@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 - 2025 Anton Tananaev (anton@traccar.org)
+ * Copyright 2017 - 2026 Anton Tananaev (anton@traccar.org)
  * Copyright 2017 Andrey Kunitsyn (andrey@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -79,8 +79,15 @@ public class CommandsManager implements BroadcastInterface {
         long deviceId = command.getDeviceId();
         Device device = storage.getObject(Device.class, new Request(
                 new Columns.All(), new Condition.Equals("id", deviceId)));
+        String data = command.getString(Command.KEY_DATA);
+        if (data != null && data.contains("{uniqueId}")) {
+            command.set(Command.KEY_DATA, data.replace("{uniqueId}", device.getUniqueId()));
+        }
         Position position = storage.getObject(Position.class, new Request(
-                new Columns.All(), new Condition.Equals("id", device.getPositionId())));
+                new Columns.All(),
+                new Condition.And(
+                        new Condition.Equals("deviceId", deviceId),
+                        new Condition.Equals("id", device.getPositionId()))));
         BaseProtocol protocol = position != null ? serverManager.getProtocol(position.getProtocol()) : null;
 
         if (command.getTextChannel()) {
@@ -90,7 +97,7 @@ public class CommandsManager implements BroadcastInterface {
             if (position != null) {
                 protocol.sendTextCommand(device.getPhone(), command);
             } else if (command.getType().equals(Command.TYPE_CUSTOM)) {
-                smsManager.sendMessage(device.getPhone(), command.getString(Command.KEY_DATA), true);
+                smsManager.sendMessage(device.getPhone(), command.getString(Command.KEY_DATA), true).get();
             } else {
                 throw new RuntimeException("Command " + command.getType() + " is not supported");
             }
@@ -154,19 +161,18 @@ public class CommandsManager implements BroadcastInterface {
     }
 
     public void updateNotificationToken(long deviceId, String token) {
-        var key = new Object();
         try {
-            cacheManager.addDevice(deviceId, key);
-            Device device = cacheManager.getObject(Device.class, deviceId);
-            device.set("notificationTokens", token);
-            storage.updateObject(device, new Request(
-                    new Columns.Include("attributes"),
-                    new Condition.Equals("id", deviceId)));
-            cacheManager.invalidateObject(true, Device.class, deviceId, ObjectOperation.UPDATE);
+            cacheManager.withDevice(deviceId, () -> {
+                Device device = cacheManager.getObject(Device.class, deviceId);
+                device.set("notificationTokens", token);
+                storage.updateObject(device, new Request(
+                        new Columns.Include("attributes"),
+                        new Condition.Equals("id", deviceId)));
+                cacheManager.invalidateObject(true, Device.class, deviceId, ObjectOperation.UPDATE);
+                return null;
+            });
         } catch (Exception e) {
             throw new RuntimeException(e);
-        } finally {
-            cacheManager.removeDevice(deviceId, key);
         }
     }
 

@@ -16,7 +16,6 @@
  */
 package org.traccar.geocoder;
 
-
 import jakarta.json.JsonObject;
 import jakarta.ws.rs.client.Client;
 
@@ -26,7 +25,7 @@ import jakarta.ws.rs.client.Client;
 public class BanGeocoder extends GeocodeJsonGeocoder {
 
     public BanGeocoder(Client client, int cacheSize, AddressFormat addressFormat) {
-        super(client, "https://api-adresse.data.gouv.fr/reverse/", null, null, cacheSize, addressFormat);
+        super(client, "https://data.geopf.fr/geocodage/reverse", null, null, cacheSize, addressFormat);
     }
 
     @Override

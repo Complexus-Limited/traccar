@@ -17,12 +17,12 @@ package org.traccar.protocol;
 
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
-import org.traccar.session.DeviceSession;
 import org.traccar.Protocol;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.model.Position;
+import org.traccar.session.DeviceSession;
 
 import java.net.SocketAddress;
 import java.util.regex.Pattern;
@@ -144,7 +144,7 @@ public class VtfmsProtocolDecoder extends BaseProtocolDecoder {
         position.set(Position.KEY_ODOMETER, parser.nextInt() * 100);
         position.set(Position.KEY_CHARGE, parser.next().equals("1"));
         position.set(Position.KEY_POWER, parser.nextDouble());
-        position.set(Position.KEY_FUEL_LEVEL, parser.nextInt());
+        position.set(Position.KEY_FUEL, parser.nextInt());
         position.set(Position.PREFIX_ADC + 1, parser.nextDouble());
         position.set(Position.PREFIX_ADC + 2, parser.nextDouble());
         position.set(Position.PREFIX_IN + 1, parser.nextInt());

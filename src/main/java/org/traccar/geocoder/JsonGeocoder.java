@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 - 2024 Anton Tananaev (anton@traccar.org)
+ * Copyright 2015 - 2026 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,19 @@
  */
 package org.traccar.geocoder;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.traccar.database.StatisticsManager;
 
+import jakarta.json.JsonArray;
 import jakarta.json.JsonObject;
+import jakarta.json.JsonString;
+import jakarta.json.JsonValue;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.InvocationCallback;
-
 import java.util.AbstractMap;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 public abstract class JsonGeocoder implements Geocoder {
@@ -37,19 +39,14 @@ public abstract class JsonGeocoder implements Geocoder {
     private final AddressFormat addressFormat;
     private StatisticsManager statisticsManager;
 
-    private Map<Map.Entry<Double, Double>, String> cache;
+    private Cache<Map.Entry<Double, Double>, String> cache;
 
     public JsonGeocoder(Client client, String url, final int cacheSize, AddressFormat addressFormat) {
         this.client = client;
         this.url = url;
         this.addressFormat = addressFormat;
         if (cacheSize > 0) {
-            this.cache = Collections.synchronizedMap(new LinkedHashMap<>() {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry eldest) {
-                    return size() > cacheSize;
-                }
-            });
+            this.cache = CacheBuilder.newBuilder().maximumSize(cacheSize).build();
         }
     }
 
@@ -59,8 +56,31 @@ public abstract class JsonGeocoder implements Geocoder {
     }
 
     protected String readValue(JsonObject object, String key) {
-        if (object.containsKey(key) && !object.isNull(key)) {
-            return object.getString(key);
+        if (object != null && object.containsKey(key) && !object.isNull(key)) {
+            JsonValue value = object.get(key);
+            if (value.getValueType() == JsonValue.ValueType.STRING) {
+                return ((JsonString) value).getString();
+            }
+        }
+        return null;
+    }
+
+    protected JsonObject readObject(JsonObject object, String key) {
+        if (object != null && object.containsKey(key) && !object.isNull(key)) {
+            JsonValue value = object.get(key);
+            if (value.getValueType() == JsonValue.ValueType.OBJECT) {
+                return (JsonObject) value;
+            }
+        }
+        return null;
+    }
+
+    protected JsonArray readArray(JsonObject object, String key) {
+        if (object != null && object.containsKey(key) && !object.isNull(key)) {
+            JsonValue value = object.get(key);
+            if (value.getValueType() == JsonValue.ValueType.ARRAY) {
+                return (JsonArray) value;
+            }
         }
         return null;
     }
@@ -81,7 +101,7 @@ public abstract class JsonGeocoder implements Geocoder {
         } else {
             String msg = "Empty address. Error: " + parseError(json);
             if (callback != null) {
-                callback.onFailure(new GeocoderException(msg));
+                callback.onFailure(new IllegalStateException(msg));
             } else {
                 LOGGER.warn(msg);
             }
@@ -94,7 +114,7 @@ public abstract class JsonGeocoder implements Geocoder {
             final double latitude, final double longitude, final ReverseGeocoderCallback callback) {
 
         if (cache != null) {
-            String cachedAddress = cache.get(new AbstractMap.SimpleImmutableEntry<>(latitude, longitude));
+            String cachedAddress = cache.getIfPresent(new AbstractMap.SimpleImmutableEntry<>(latitude, longitude));
             if (cachedAddress != null) {
                 if (callback != null) {
                     callback.onSuccess(cachedAddress);
