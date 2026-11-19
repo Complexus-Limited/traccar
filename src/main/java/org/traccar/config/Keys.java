@@ -1068,6 +1068,15 @@ public final class Keys {
             5000);
 
     /**
+     * List of protocols to forward raw data for. If not specified, raw data is forwarded for all protocols.
+     * The value is a comma-separated list of protocol names.
+     * Example value: teltonika,osmand
+     */
+    public static final ConfigKey<String> SERVER_FORWARD_PROTOCOLS = new StringConfigKey(
+            "server.forward.protocols",
+            List.of(KeyType.CONFIG));
+
+    /**
      * Connect timeout for the shared HTTP client in milliseconds, used for notifications and other outgoing
      * HTTP requests. Defaults to 5000.
      */
@@ -1884,6 +1893,15 @@ public final class Keys {
     public static final ConfigKey<Boolean> COORDINATES_FILTER = new BooleanConfigKey(
             "coordinates.filter",
             List.of(KeyType.CONFIG));
+
+    /**
+     * Replace coordinates of invalid (valid field is set to false) positions with the last known coordinates.
+     * Requires 'coordinates.filter' to be enabled. Disabled by default.
+     */
+    public static final ConfigKey<Boolean> COORDINATES_FILTER_INVALID = new BooleanConfigKey(
+            "coordinates.filterInvalid",
+            List.of(KeyType.CONFIG),
+            false);
 
     /**
      * Distance in meters. Distances below this value get handled as explained in 'coordinates.filter'.
