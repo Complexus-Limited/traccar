@@ -63,6 +63,7 @@ public abstract class ExtendedObjectDecoder extends ChannelInboundHandlerAdapter
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         NetworkMessage networkMessage = (NetworkMessage) msg;
