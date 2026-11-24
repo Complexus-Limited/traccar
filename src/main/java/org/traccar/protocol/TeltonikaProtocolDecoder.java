@@ -190,7 +190,7 @@
         Predicate<String> any = (m) -> true;
         Predicate<String> fmbXXX = (m) -> m != null && m.matches("FM[B-Z]...|MTB100|MSP500");
         Predicate<String> fmb6XX = (m) -> m != null && m.matches("FM.6..");
-        Predicate<String> tatXXX = (m) -> m != null && m.matches("T.T...");
+        Predicate<String> tatXXX = (m) -> m != null && m.matches("T.T...|GH5200");
         Predicate<String> ftXXX = (m) -> m != null && m.matches("(FT[A-Z]|AT[CM])\\d{3}");
 
         register(1, any, (p, b) -> p.set(Position.PREFIX_IN + 1, b.readUnsignedByte() > 0));
@@ -226,12 +226,14 @@
         register(30, fmbXXX, (p, b) -> p.set("faultCount", b.readUnsignedByte()));
         register(31, fmbXXX, (p, b) -> p.set(Position.KEY_ENGINE_LOAD, b.readUnsignedByte()));
         register(32, fmbXXX, (p, b) -> p.set(Position.KEY_COOLANT_TEMP, b.readByte()));
+        register(33, fmbXXX, (p, b) -> p.set("shortFuelTrim", b.readByte()));
         register(36, fmbXXX, (p, b) -> p.set(Position.KEY_RPM, b.readUnsignedShort()));
-        register(39, fmbXXX, (p, b)-> p.set("intakeAirTemp", b.readByte()));
-        register(40, fmbXXX, (p, b)-> p.set("maf", b.readUnsignedShort() * 0.01));
+        register(39, fmbXXX, (p, b) -> p.set("intakeAirTemperature", b.readByte()));
+        register(40, fmbXXX, (p, b) -> p.set("maf", b.readUnsignedShort() / 100.0));
         register(41, fmbXXX, (p, b) -> p.set(Position.KEY_THROTTLE, b.readUnsignedByte()));
         register(43, fmbXXX, (p, b) -> p.set("milDistance", b.readUnsignedShort()));
         register(47, fmbXXX, (p, b) -> p.set("egrError", b.readByte()));
+        register(48, fmbXXX, (p, b) -> p.set(Position.KEY_FUEL_LEVEL, b.readUnsignedByte()));
         register(57, fmbXXX, (p, b) -> p.set("hybridBatteryLevel", b.readByte()));
         register(66, any, (p, b) -> p.set(Position.KEY_POWER, b.readUnsignedShort() / 1000.0));
         register(67, any, (p, b) -> p.set(Position.KEY_BATTERY, b.readUnsignedShort() / 1000.0));
@@ -276,7 +278,7 @@
         register(175, any, (p, b) -> {
             p.addAlarm(b.readUnsignedByte() > 0 ? Position.ALARM_GEOFENCE_ENTER : Position.ALARM_GEOFENCE_EXIT);
         });
-        register(389, "FMB003"::equals, (p, b) -> p.set(Position.KEY_OBD_ODOMETER, b.readUnsignedInt() * 1000));
+        register(389, fmbXXX, (p, b) -> p.set(Position.KEY_OBD_ODOMETER, b.readUnsignedInt()));
         register(411, fmbXXX, (p, b) -> p.set(Position.KEY_ENERGY_LEVEL, b.readUnsignedByte()));
         register(1383, fmbXXX, (p, b) -> p.set(Position.KEY_ENERGY, b.readUnsignedShort() / 100.0));
         register(701, fmb6XX, (p, b) -> p.set("bleTemp1", b.readShort() / 10.0));
